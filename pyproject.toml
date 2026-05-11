@@ -3,7 +3,7 @@ name = "cciu"
 version = "0.1.0"
 description = "Computational clinical imaging utilities from the Computational Clinical Imaging Group"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "requests>=2.33.1",
     "simpleitk>=2.5.4",
