@@ -6,10 +6,15 @@ resampling images to a target geometry, changing spacing, and applying
 connected-component and morphology operations to masks.
 """
 
+import os
 import numpy as np
 import SimpleITK as sitk
+from glob import glob
 from typing import Sequence
+from pydicom import dcmread
+from pydicom_seg import MultiClassReader
 
+from cciu.dicom_utils import sort_dicom_slices, filter_by_bvalue_from_dict
 from cciu.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -506,7 +511,7 @@ def read_dicom_seg_as_volume(path: str) -> sitk.Image:
                 "The downloaded segmentation series contains more than one file"
             )
         path = path[0]
-    image = pydicom.dcmread(path)
+    image = dcmread(path)
     assert (
         image.SOPClassUID == "1.2.840.10008.5.1.4.1.1.66.4"
     ), f"Expected SOPClassUID 1.2.840.10008.5.1.4.1.1.66.4, got {image.SOPClassUID}"
