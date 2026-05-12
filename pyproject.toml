@@ -8,6 +8,7 @@ dependencies = [
     "numpy>=2.2.6",
     "pydicom>=3.0.2",
     "pydicom-seg",
+    "pytest>=9.0.3",
     "requests>=2.33.1",
     "simpleitk>=2.5.4",
 ]

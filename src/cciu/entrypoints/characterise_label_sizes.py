@@ -1,4 +1,5 @@
 import argparse
+import multiprocessing
 import re
 import statistics
 import SimpleITK as sitk
@@ -27,6 +28,13 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
 
 
+def _process_label_file(file: Path):
+    img = sitk.ReadImage(str(file))
+    basic_info = basic_image_information(img)
+    n_labels, pixel_sizes, physical_sizes = get_unique_labels(img)
+    return str(file), basic_info, n_labels, pixel_sizes, physical_sizes
+
+
 def main(args):
     sitk_regex = re.compile(args.sitk_regex)
     label_regex = re.compile(args.label_regex)
@@ -41,32 +49,42 @@ def main(args):
     pixel_sizes_per_label: dict[int, list[int]] = {}
     physical_sizes_per_label: dict[int, list[float]] = {}
     print("files:")
-    for file in label_files:
-        img = sitk.ReadImage(file)
-        basic_info = basic_image_information(img)
-        n_labels, pixel_sizes, physical_sizes = get_unique_labels(img)
-        all_n_labels.append(n_labels)
 
-        # Aggregate pixel sizes per label index (1-based), ignoring zeros
-        if pixel_sizes:
-            for idx, v in enumerate(pixel_sizes, start=1):
-                if v == 0:
-                    continue
-                pixel_sizes_per_label.setdefault(idx, []).append(v)
+    if label_files:
+        n_workers = args.n_cores or multiprocessing.cpu_count()
+        with multiprocessing.Pool(processes=n_workers) as pool:
+            results = pool.map(_process_label_file, label_files)
 
-        # Aggregate physical sizes per label index (1-based), independently, ignoring zeros
-        if physical_sizes:
-            for idx, v in enumerate(physical_sizes, start=1):
-                if v == 0:
-                    continue
-                physical_sizes_per_label.setdefault(idx, []).append(v)
-        print(f'- file: "{str(file)}"')
-        print(f"  spacing: {basic_info['spacing']}")
-        print(f"  size: {basic_info['size']}")
-        print(f"  origin: {basic_info['origin']}")
-        print(f"  n_labels: {n_labels}")
-        print(f"  pixel_sizes: {pixel_sizes}")
-        print(f"  physical_sizes: {physical_sizes}")
+        for (
+            file_str,
+            basic_info,
+            n_labels,
+            pixel_sizes,
+            physical_sizes,
+        ) in results:
+            all_n_labels.append(n_labels)
+
+            # Aggregate pixel sizes per label index (1-based), ignoring zeros
+            if pixel_sizes:
+                for idx, v in enumerate(pixel_sizes, start=1):
+                    if v == 0:
+                        continue
+                    pixel_sizes_per_label.setdefault(idx, []).append(v)
+
+            # Aggregate physical sizes per label index (1-based), independently, ignoring zeros
+            if physical_sizes:
+                for idx, v in enumerate(physical_sizes, start=1):
+                    if v == 0:
+                        continue
+                    physical_sizes_per_label.setdefault(idx, []).append(v)
+
+            print(f'- file: "{file_str}"')
+            print(f"  spacing: {basic_info['spacing']}")
+            print(f"  size: {basic_info['size']}")
+            print(f"  origin: {basic_info['origin']}")
+            print(f"  n_labels: {n_labels}")
+            print(f"  pixel_sizes: {pixel_sizes}")
+            print(f"  physical_sizes: {physical_sizes}")
 
     print("overall:")
 
@@ -120,5 +138,14 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     add_arguments(parser)
+    parser.add_argument(
+        "--n_cores",
+        type=int,
+        default=None,
+        help=(
+            "Number of worker processes to use for parallel file processing "
+            "(default: all available cores)"
+        ),
+    )
     args = parser.parse_args()
     main(args)
