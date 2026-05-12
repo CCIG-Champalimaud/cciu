@@ -18,3 +18,6 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 pydicom-seg = { git = "https://github.com/josegcpa/pydicom-seg" }
+
+[project.scripts]
+cciu = "cciu.__main__:main_cli"

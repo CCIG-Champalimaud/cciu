@@ -29,6 +29,8 @@ uv pip install .
 
 You will need a running Orthanc instance if you use the Orthanc/DICOM server helpers.
 
+After installation, a `cciu` command-line entrypoint is available (see below).
+
 ## Package structure
 
 ```text
@@ -40,6 +42,33 @@ src/
     orthanc_utils.py     # Orthanc DICOM server utilities
     sitk_utils.py        # SimpleITK-based image utilities
 ```
+
+## Command-line usage
+
+Installing the package exposes a `cciu` console script (configured in `pyproject.toml` as `cciu.__main__:main_cli`).
+
+Available subcommands:
+
+- `cciu describe_sitk`  
+  Describe basic properties (spacing, size, origin, labels) of one or more SITK-readable images.
+
+  Example:
+
+  ```bash
+  uv run cciu describe_sitk --input /path/to/image1.nii.gz /path/to/image2.nrrd
+  ```
+
+- `cciu characterise_label_sizes`  
+  Characterise label distributions (per-file and overall statistics) in a directory of SITK-readable label images.
+
+  Example:
+
+  ```bash
+  uv run cciu characterise_label_sizes \
+      --input /path/to/labels_dir \
+      --sitk_regex '(\.nrrd|\.mha|.*\.nii(\.gz)?)$' \
+      --label_regex '.*'
+  ```
 
 ## Modules
 

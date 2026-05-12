@@ -1,7 +1,7 @@
 from cciu.entrypoints import describe_sitk
 from cciu.entrypoints import characterise_label_sizes
 
-if __name__ == "__main__":
+def main_cli():    
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -22,3 +22,6 @@ if __name__ == "__main__":
         describe_sitk.main(args)
     elif args.command == "characterise_label_sizes":
         characterise_label_sizes.main(args)
+
+if __name__ == "__main__":
+    main_cli()
