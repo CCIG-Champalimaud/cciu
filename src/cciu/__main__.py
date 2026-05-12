@@ -15,7 +15,7 @@ def main_cli():
     )
     describe_sitk.add_arguments(describe_sitk_subparser)
     characterise_label_sizes_subparser = subparsers.add_parser(
-        "characterise_label_sizes",
+        "characterise-label-sizes",
         help="Characterises the label sizes in a folder with SITK-readable files",
     )
     characterise_label_sizes.add_arguments(characterise_label_sizes_subparser)
@@ -41,7 +41,7 @@ def main_cli():
     args = parser.parse_args()
     if args.command == "describe_sitk":
         describe_sitk.main(args)
-    elif args.command == "characterise_label_sizes":
+    elif args.command == "characterise-label-sizes":
         characterise_label_sizes.main(args)
     elif args.command == "dicom-bvalue-table":
         dicom_bvalue_table.main(args)

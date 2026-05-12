@@ -6,7 +6,11 @@ from pathlib import Path
 
 import SimpleITK as sitk
 
-from cciu.entrypoints._output_utils import open_output, write_output
+from cciu.entrypoints._output_utils import (
+    label_rows_to_long_format,
+    open_output,
+    write_output,
+)
 from cciu.entrypoints.describe_sitk import (
     basic_image_information,
     get_unique_labels,
@@ -148,7 +152,11 @@ def main(args):
 
     fh, close_out = open_output(args.output)
     try:
-        write_output([output_data], args.format, fh)
+        if args.format == "csv":
+            long_rows, fieldnames = label_rows_to_long_format(file_rows)
+            write_output(long_rows, "csv", fh, fieldnames=fieldnames)
+        else:
+            write_output([output_data], args.format, fh)
     finally:
         if close_out and fh is not None:
             fh.close()

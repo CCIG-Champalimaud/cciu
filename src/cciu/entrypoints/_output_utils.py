@@ -1,7 +1,6 @@
 """Shared output helpers for cciu entrypoints."""
 
 import csv
-import io
 import json
 import sys
 from typing import Any, IO
@@ -72,6 +71,53 @@ def _to_yaml_safe(v: Any) -> Any:
     if isinstance(v, (int, float, bool, str)) or v is None:
         return v
     return str(v)
+
+
+def label_rows_to_long_format(
+    file_rows: list[dict[str, Any]],
+    file_key: str = "file",
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Expand per-file label rows into true long format.
+
+    Produces one row per (file, attribute, label_index) with columns:
+    ``file``, ``attribute``, ``label_index``, ``value``.
+
+    Scalar attributes (non-list values other than *file_key*) are emitted
+    with ``label_index`` of ``None``.  List-valued attributes are emitted
+    once per element with 1-based ``label_index``.
+
+    Returns:
+        (long_rows, fieldnames)
+    """
+    fieldnames = ["file", "attribute", "label_index", "value"]
+    long_rows: list[dict[str, Any]] = []
+
+    for row in file_rows:
+        file_val = row.get(file_key, "")
+        for k, v in row.items():
+            if k == file_key:
+                continue
+            if isinstance(v, (list, tuple)):
+                for idx, elem in enumerate(v, start=1):
+                    long_rows.append(
+                        {
+                            "file": file_val,
+                            "attribute": k,
+                            "label_index": idx,
+                            "value": elem,
+                        }
+                    )
+            else:
+                long_rows.append(
+                    {
+                        "file": file_val,
+                        "attribute": k,
+                        "label_index": None,
+                        "value": v,
+                    }
+                )
+
+    return long_rows, fieldnames
 
 
 def open_output(path: str | None) -> tuple[IO[str] | None, bool]:

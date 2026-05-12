@@ -2,7 +2,11 @@ import argparse
 
 import SimpleITK as sitk
 
-from cciu.entrypoints._output_utils import open_output, write_output
+from cciu.entrypoints._output_utils import (
+    label_rows_to_long_format,
+    open_output,
+    write_output,
+)
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
@@ -109,7 +113,11 @@ def main(args):
 
     fh, close_out = open_output(args.output)
     try:
-        write_output(rows, args.format, fh)
+        if args.format == "csv":
+            long_rows, fieldnames = label_rows_to_long_format(rows)
+            write_output(long_rows, "csv", fh, fieldnames=fieldnames)
+        else:
+            write_output(rows, args.format, fh)
     finally:
         if close_out and fh is not None:
             fh.close()
