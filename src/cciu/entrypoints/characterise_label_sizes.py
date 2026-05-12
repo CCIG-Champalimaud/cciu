@@ -37,18 +37,29 @@ def main(args):
     label_files = [f for f in sitk_files if label_regex.search(str(f))]
 
     all_n_labels = []
-    all_pixel_sizes = []
-    all_physical_sizes = []
+    # Per-label aggregates: label_index -> list of values
+    pixel_sizes_per_label: dict[int, list[int]] = {}
+    physical_sizes_per_label: dict[int, list[float]] = {}
     print("files:")
     for file in label_files:
         img = sitk.ReadImage(file)
         basic_info = basic_image_information(img)
         n_labels, pixel_sizes, physical_sizes = get_unique_labels(img)
         all_n_labels.append(n_labels)
+
+        # Aggregate pixel sizes per label index (1-based), ignoring zeros
         if pixel_sizes:
-            all_pixel_sizes.extend(pixel_sizes)
+            for idx, v in enumerate(pixel_sizes, start=1):
+                if v == 0:
+                    continue
+                pixel_sizes_per_label.setdefault(idx, []).append(v)
+
+        # Aggregate physical sizes per label index (1-based), independently, ignoring zeros
         if physical_sizes:
-            all_physical_sizes.extend(physical_sizes)
+            for idx, v in enumerate(physical_sizes, start=1):
+                if v == 0:
+                    continue
+                physical_sizes_per_label.setdefault(idx, []).append(v)
         print(f'- file: "{str(file)}"')
         print(f"  spacing: {basic_info['spacing']}")
         print(f"  size: {basic_info['size']}")
@@ -69,29 +80,41 @@ def main(args):
     else:
         print("  n_files: 0")
 
-    if all_pixel_sizes:
-        print("  pixel_sizes:")
-        print(f"    count: {len(all_pixel_sizes)}")
-        print(f"    min: {min(all_pixel_sizes)}")
-        print(f"    max: {max(all_pixel_sizes)}")
-        print(f"    mean: {statistics.mean(all_pixel_sizes):.3f}")
-        print(f"    median: {statistics.median(all_pixel_sizes):.3f}")
-        if len(all_pixel_sizes) > 1:
-            print(f"    stdev: {statistics.stdev(all_pixel_sizes):.3f}")
-    else:
-        print("  pixel_sizes: []")
+    # Per-label distributions
+    if pixel_sizes_per_label or physical_sizes_per_label:
+        print("  labels:")
+        for label_idx in sorted(
+            set(pixel_sizes_per_label) | set(physical_sizes_per_label)
+        ):
+            print(f"    {label_idx}:")
 
-    if all_physical_sizes:
-        print("  physical_sizes:")
-        print(f"    count: {len(all_physical_sizes)}")
-        print(f"    min: {min(all_physical_sizes):.6f}")
-        print(f"    max: {max(all_physical_sizes):.6f}")
-        print(f"    mean: {statistics.mean(all_physical_sizes):.6f}")
-        print(f"    median: {statistics.median(all_physical_sizes):.6f}")
-        if len(all_physical_sizes) > 1:
-            print(f"    stdev: {statistics.stdev(all_physical_sizes):.6f}")
-    else:
-        print("  physical_sizes: []")
+            # Pixel sizes for this label
+            pix_vals = pixel_sizes_per_label.get(label_idx, [])
+            if pix_vals:
+                print("      pixel_sizes:")
+                print(f"        count: {len(pix_vals)}")
+                print(f"        min: {min(pix_vals)}")
+                print(f"        max: {max(pix_vals)}")
+                print(f"        mean: {statistics.mean(pix_vals):.3f}")
+                print(f"        median: {statistics.median(pix_vals):.3f}")
+                if len(pix_vals) > 1:
+                    print(f"        stdev: {statistics.stdev(pix_vals):.3f}")
+            else:
+                print("      pixel_sizes: []")
+
+            # Physical sizes for this label
+            phys_vals = physical_sizes_per_label.get(label_idx, [])
+            if phys_vals:
+                print("      physical_sizes:")
+                print(f"        count: {len(phys_vals)}")
+                print(f"        min: {min(phys_vals):.6f}")
+                print(f"        max: {max(phys_vals):.6f}")
+                print(f"        mean: {statistics.mean(phys_vals):.6f}")
+                print(f"        median: {statistics.median(phys_vals):.6f}")
+                if len(phys_vals) > 1:
+                    print(f"        stdev: {statistics.stdev(phys_vals):.6f}")
+            else:
+                print("      physical_sizes: []")
 
 
 if __name__ == "__main__":
