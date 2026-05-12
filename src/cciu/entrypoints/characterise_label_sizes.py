@@ -9,6 +9,7 @@ import SimpleITK as sitk
 from cciu.entrypoints._output_utils import (
     label_rows_to_long_format,
     open_output,
+    overall_to_long_format,
     write_output,
 )
 from cciu.entrypoints.describe_sitk import (
@@ -154,6 +155,7 @@ def main(args):
     try:
         if args.format == "csv":
             long_rows, fieldnames = label_rows_to_long_format(file_rows)
+            long_rows += overall_to_long_format(overall)
             write_output(long_rows, "csv", fh, fieldnames=fieldnames)
         else:
             write_output([output_data], args.format, fh)

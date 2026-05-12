@@ -76,15 +76,17 @@ def _to_yaml_safe(v: Any) -> Any:
 def label_rows_to_long_format(
     file_rows: list[dict[str, Any]],
     file_key: str = "file",
+    label_keys: tuple[str, ...] = ("pixel_sizes", "physical_sizes"),
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Expand per-file label rows into true long format.
 
     Produces one row per (file, attribute, label_index) with columns:
     ``file``, ``attribute``, ``label_index``, ``value``.
 
-    Scalar attributes (non-list values other than *file_key*) are emitted
-    with ``label_index`` of ``None``.  List-valued attributes are emitted
-    once per element with 1-based ``label_index``.
+    Only fields named in *label_keys* are expanded element-by-element with a
+    1-based ``label_index``.  All other fields (including list-valued spatial
+    metadata like spacing/size/origin) are emitted as a single row with
+    ``label_index=None`` and the value stringified.
 
     Returns:
         (long_rows, fieldnames)
@@ -97,7 +99,7 @@ def label_rows_to_long_format(
         for k, v in row.items():
             if k == file_key:
                 continue
-            if isinstance(v, (list, tuple)):
+            if k in label_keys and isinstance(v, (list, tuple)):
                 for idx, elem in enumerate(v, start=1):
                     long_rows.append(
                         {
@@ -113,11 +115,57 @@ def label_rows_to_long_format(
                         "file": file_val,
                         "attribute": k,
                         "label_index": None,
-                        "value": v,
+                        "value": str(v) if isinstance(v, (list, tuple)) else v,
                     }
                 )
 
     return long_rows, fieldnames
+
+
+def overall_to_long_format(
+    overall: dict[str, Any],
+    file_label: str = "__overall__",
+    labels_key: str = "labels",
+) -> list[dict[str, Any]]:
+    """Flatten an overall summary dict into long-format rows.
+
+    Scalar fields become one row each with ``label_index=None``.
+    The nested per-label stats (under *labels_key*) are flattened into
+    attribute names like ``label_1_pixel_sizes_mean``, one row per stat.
+
+    Returns rows with the same schema as :func:`label_rows_to_long_format`:
+    ``file``, ``attribute``, ``label_index``, ``value``.
+    """
+    rows: list[dict[str, Any]] = []
+
+    for k, v in overall.items():
+        if k == labels_key:
+            continue
+        rows.append(
+            {
+                "file": file_label,
+                "attribute": k,
+                "label_index": None,
+                "value": v,
+            }
+        )
+
+    label_stats = overall.get(labels_key, {})
+    for label_idx, stat_groups in label_stats.items():
+        for group_name, stats in stat_groups.items():
+            if isinstance(stats, dict):
+                for stat_name, stat_val in stats.items():
+                    attribute = f"label_{label_idx}_{group_name}_{stat_name}"
+                    rows.append(
+                        {
+                            "file": file_label,
+                            "attribute": attribute,
+                            "label_index": None,
+                            "value": stat_val,
+                        }
+                    )
+
+    return rows
 
 
 def open_output(path: str | None) -> tuple[IO[str] | None, bool]:

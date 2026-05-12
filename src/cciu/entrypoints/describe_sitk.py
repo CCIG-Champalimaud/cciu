@@ -114,7 +114,13 @@ def main(args):
     fh, close_out = open_output(args.output)
     try:
         if args.format == "csv":
-            long_rows, fieldnames = label_rows_to_long_format(rows)
+            long_rows, fieldnames = label_rows_to_long_format(
+                rows,
+                label_keys=(
+                    "pixel_sizes_per_label",
+                    "physical_sizes_per_label",
+                ),
+            )
             write_output(long_rows, "csv", fh, fieldnames=fieldnames)
         else:
             write_output(rows, args.format, fh)
