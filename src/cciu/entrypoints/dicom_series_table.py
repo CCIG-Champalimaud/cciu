@@ -1,14 +1,12 @@
 import argparse
-import csv
-import json
 import os
-import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 from pydicom import dcmread
 
+from cciu.entrypoints._output_utils import open_output, write_output
 from cciu.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -27,7 +25,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--format",
-        choices=["csv", "json", "jsonl"],
+        choices=["csv", "json", "jsonl", "yaml"],
         default="csv",
         help="Output format (default: csv)",
     )
@@ -102,13 +100,6 @@ def main(args: argparse.Namespace) -> None:
         }
         rows.append(row)
 
-    if args.output:
-        out_fh = open(args.output, "w", newline="", encoding="utf-8")
-        close_out = True
-    else:
-        out_fh = None
-        close_out = False
-
     fieldnames = [
         "patient_id",
         "study_uid",
@@ -124,26 +115,9 @@ def main(args: argparse.Namespace) -> None:
         "columns",
         "num_instances",
     ]
-
+    out_fh, close_out = open_output(args.output)
     try:
-        if args.format == "csv":
-            writer = csv.DictWriter(out_fh or sys.stdout, fieldnames=fieldnames)
-            writer.writeheader()
-            for row in rows:
-                writer.writerow(row)
-        elif args.format == "json":
-            text = json.dumps(rows, indent=2, default=str)
-            if out_fh is None:
-                print(text)
-            else:
-                out_fh.write(text + "\n")
-        else:  # jsonl
-            for row in rows:
-                line = json.dumps(row, default=str)
-                if out_fh is None:
-                    print(line)
-                else:
-                    out_fh.write(line + "\n")
+        write_output(rows, args.format, out_fh, fieldnames=fieldnames)
     finally:
         if close_out and out_fh is not None:
             out_fh.close()

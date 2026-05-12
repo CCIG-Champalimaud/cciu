@@ -9,6 +9,7 @@ dependencies = [
     "pydicom>=3.0.2",
     "pydicom-seg",
     "pytest>=9.0.3",
+    "pyyaml>=6.0",
     "requests>=2.33.1",
     "simpleitk>=2.5.4",
 ]

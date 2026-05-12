@@ -1,6 +1,8 @@
 import argparse
+
 import SimpleITK as sitk
 
+from cciu.entrypoints._output_utils import open_output, write_output
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
@@ -8,6 +10,17 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         help="Input files",
         nargs="+",
         required=True,
+    )
+    parser.add_argument(
+        "--output",
+        help="Optional path to output file (default: stdout)",
+        default=None,
+    )
+    parser.add_argument(
+        "--format",
+        choices=["csv", "json", "jsonl", "yaml"],
+        default="yaml",
+        help="Output format (default: yaml)",
     )
     return parser
 
@@ -78,14 +91,28 @@ def print_unique_values(image: sitk.Image):
 
 
 def main(args):
+    rows = []
     for inp in args.input:
         img = sitk.ReadImage(inp)
         basic_info = basic_image_information(img)
-        print(f"- file: {inp}")
-        print(f"  spacing: {list(basic_info['spacing'])}")
-        print(f"  size: {list(basic_info['size'])}")
-        print(f"  origin: {list(basic_info['origin'])}")
-        print_unique_values(img)
+        n_labels, pixel_sizes, physical_sizes = get_unique_labels(img)
+        row = {
+            "file": inp,
+            "spacing": list(basic_info["spacing"]),
+            "size": list(basic_info["size"]),
+            "origin": list(basic_info["origin"]),
+            "n_labels": n_labels,
+            "pixel_sizes_per_label": pixel_sizes,
+            "physical_sizes_per_label": physical_sizes,
+        }
+        rows.append(row)
+
+    fh, close_out = open_output(args.output)
+    try:
+        write_output(rows, args.format, fh)
+    finally:
+        if close_out and fh is not None:
+            fh.close()
 
 
 if __name__ == "__main__":

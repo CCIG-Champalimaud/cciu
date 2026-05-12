@@ -1,14 +1,12 @@
 import argparse
-import csv
-import json
 import os
-import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 from pydicom import dcmread
 
+from cciu.entrypoints._output_utils import open_output, write_output
 from cciu.entrypoints.dicom_bvalue_table import (
     _extract_bvalue,
     _extract_bvalue_ge,
@@ -84,7 +82,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--format",
-        choices=["csv", "json", "jsonl"],
+        choices=["csv", "json", "jsonl", "yaml"],
         default="csv",
         help="Output format (default: csv)",
     )
@@ -150,33 +148,9 @@ def main(args: argparse.Namespace) -> None:
 
             feature_rows.append(row)
 
-    if args.output:
-        fh = open(args.output, "w", encoding="utf-8", newline="")
-        close_out = True
-    else:
-        fh = None
-        close_out = False
-
+    fh, close_out = open_output(args.output)
     try:
-        if args.format == "csv":
-            fieldnames = field_names
-            writer = csv.DictWriter(fh or sys.stdout, fieldnames=fieldnames)
-            writer.writeheader()
-            for row in feature_rows:
-                writer.writerow(row)
-        elif args.format == "json":
-            text = json.dumps(feature_rows, indent=2, default=str)
-            if fh is None:
-                print(text)
-            else:
-                fh.write(text + "\n")
-        else:  # jsonl
-            for row in feature_rows:
-                line = json.dumps(row, default=str)
-                if fh is None:
-                    print(line)
-                else:
-                    fh.write(line + "\n")
+        write_output(feature_rows, args.format, fh, fieldnames=field_names)
     finally:
         if close_out and fh is not None:
             fh.close()
