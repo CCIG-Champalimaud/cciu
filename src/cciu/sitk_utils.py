@@ -508,7 +508,7 @@ def read_dicom_seg_as_volume(path: str) -> sitk.Image:
         path = glob(os.path.join(path, "*"))
         if len(path) > 1:
             raise ValueError(
-                "The downloaded segmentation series contains more than one file"
+                f"The segmentation series contains more than one file: {path}"
             )
         path = path[0]
     image = dcmread(path)
