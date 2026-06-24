@@ -99,12 +99,12 @@ def sort_dicom_slices(file_paths: list[str]) -> list[str]:
     return [file_paths[i] for i in order]
 
 
-def get_orientation_string(dicom_file: Dataset) -> str:
+def get_orientation_string(dicom_file: pydicom.dataset.Dataset) -> str:
     """
     Gets the orientation string from a DICOM dataset.
 
     Args:
-        dicom_file (Dataset): DICOM dataset.
+        dicom_file (pydicom.dataset.Dataset): DICOM dataset.
 
     Returns:
         str: orientation string.
