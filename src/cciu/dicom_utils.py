@@ -97,3 +97,26 @@ def sort_dicom_slices(file_paths: list[str]) -> list[str]:
         instance_numbers.append(int(getattr(ds, "InstanceNumber")))
     order = np.argsort(np.array(instance_numbers))
     return [file_paths[i] for i in order]
+
+
+def get_orientation_string(dicom_file: Dataset) -> str:
+    """
+    Gets the orientation string from a DICOM dataset.
+
+    Args:
+        dicom_file (Dataset): DICOM dataset.
+
+    Returns:
+        str: orientation string.
+    """
+
+    orientation = dicom_file.get("ImageOrientationPatient", None)
+    orientation = [round(x) for x in orientation]
+    plane = np.cross(IOP_round[0:3], IOP_round[3:6])
+    plane = [abs(x) for x in plane]
+    if plane[0] == 1:
+        return "Sagittal"
+    elif plane[1] == 1:
+        return "Coronal"
+    elif plane[2] == 1:
+        return "Axial"
