@@ -1,5 +1,6 @@
 import numpy as np
 from pydicom import dcmread
+from pydicom.dataset import Dataset
 
 from cciu.logging_utils import get_logger
 
@@ -99,12 +100,12 @@ def sort_dicom_slices(file_paths: list[str]) -> list[str]:
     return [file_paths[i] for i in order]
 
 
-def get_orientation_string(dicom_file: pydicom.dataset.Dataset) -> str:
+def get_orientation_string(dicom_file: Dataset) -> str:
     """
     Gets the orientation string from a DICOM dataset.
 
     Args:
-        dicom_file (pydicom.dataset.Dataset): DICOM dataset.
+        dicom_file (Dataset): DICOM dataset.
 
     Returns:
         str: orientation string.
