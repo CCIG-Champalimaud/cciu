@@ -111,7 +111,10 @@ def get_orientation_string(dicom_file: Dataset) -> str:
         str: orientation string.
     """
 
-    orientation = dicom_file.get("ImageOrientationPatient", None)
+    ORIENTATION_KEY = [0x0020, 0x0037]
+    if ORIENTATION_KEY not in orientation:
+        return "Not available"
+    orientation = dicom_file[ORIENTATION_KEY]
     orientation = [round(x) for x in orientation]
     plane = np.cross(IOP_round[0:3], IOP_round[3:6])
     plane = [abs(x) for x in plane]
