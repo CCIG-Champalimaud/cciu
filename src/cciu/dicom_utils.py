@@ -112,7 +112,7 @@ def get_orientation_string(dicom_file: Dataset) -> str:
     """
 
     ORIENTATION_KEY = [0x0020, 0x0037]
-    if ORIENTATION_KEY not in orientation:
+    if ORIENTATION_KEY not in dicom_file:
         return "Not available"
     orientation = dicom_file[ORIENTATION_KEY]
     if not orientation:
