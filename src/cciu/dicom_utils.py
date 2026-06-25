@@ -118,7 +118,7 @@ def get_orientation_string(dicom_file: Dataset) -> str:
     if not orientation:
         return "Not available"
     orientation = [round(x) for x in orientation]
-    plane = np.cross(IOP_round[0:3], IOP_round[3:6])
+    plane = np.cross(orientation[0:3], orientation[3:6])
     plane = [abs(x) for x in plane]
     if plane[0] == 1:
         return "Sagittal"
