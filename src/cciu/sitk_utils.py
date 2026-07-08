@@ -238,6 +238,15 @@ def resample_image_to_target(
 def to_closest_canonical_sitk(
     img: sitk.Image | list[sitk.Image],
 ) -> sitk.Image | list[sitk.Image]:
+    """
+    Converts an image to the closest canonical orientation.
+    
+    Args:
+        img: The image to convert.
+        
+    Returns:
+        The image in canonical orientation.
+    """
     if isinstance(img, list):
         return [to_closest_canonical_sitk(i) for i in img]
     direction = img.GetDirection()
@@ -262,6 +271,16 @@ def from_closest_canonical_sitk(
     canonical_img: sitk.Image | list[sitk.Image],
     original_img: sitk.Image | list[sitk.Image],
 ) -> sitk.Image | list[sitk.Image]:
+    """
+    Restores a canonical image to its original orientation.
+    
+    Args:
+        canonical_img: The canonical image to restore.
+        original_img: The original image to match.
+        
+    Returns:
+        The restored image matching the original properties.
+    """
     if isinstance(canonical_img, list):
         return [
             from_closest_canonical_sitk(i, o)
