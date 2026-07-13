@@ -1,3 +1,5 @@
+"""CLI entrypoint to characterise label sizes in a directory of images."""
+
 import argparse
 import multiprocessing
 import re
@@ -19,6 +21,14 @@ from cciu.entrypoints.describe_sitk import (
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Add ``characterise_label_sizes`` arguments to an argument parser.
+
+    Args:
+        parser (argparse.ArgumentParser): The parser to populate.
+
+    Returns:
+        argparse.ArgumentParser: The populated parser.
+    """
     parser.add_argument(
         "--input",
         help="Path to directory containing label images",
@@ -57,15 +67,36 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     return parser
 
 
-def _process_label_file(file: Path):
+def _process_label_file(
+    file: Path,
+) -> tuple[str, dict, int, list[int], list[float]]:
+    """Load a label image and extract its metadata and per-label sizes.
+
+    Args:
+        file (Path): Path to the label image.
+
+    Returns:
+        tuple[str, dict, int, list[int], list[float]]: The file path, basic
+            image information, number of labels, pixel sizes per label, and
+            physical sizes per label.
+    """
     img = sitk.ReadImage(str(file))
     basic_info = basic_image_information(img)
     n_labels, pixel_sizes, physical_sizes = get_unique_labels(img)
     return str(file), basic_info, n_labels, pixel_sizes, physical_sizes
 
 
-def _stats(values: list) -> dict:
-    d: dict = {
+def _stats(values: list[float]) -> dict[str, float | int]:
+    """Compute basic statistics for a list of numeric values.
+
+    Args:
+        values (list[float]): The values to summarise.
+
+    Returns:
+        dict[str, float | int]: A dictionary with count, min, max, mean,
+            median, and optionally standard deviation.
+    """
+    d: dict[str, float | int] = {
         "count": len(values),
         "min": min(values),
         "max": max(values),
@@ -77,7 +108,14 @@ def _stats(values: list) -> dict:
     return d
 
 
-def main(args):
+def main(args: argparse.Namespace) -> None:
+    """Characterise label sizes and write the results.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI arguments, including ``input``,
+            ``output``, ``format``, ``sitk_regex``, ``label_regex``, and
+            ``n_cores``.
+    """
     sitk_regex = re.compile(args.sitk_regex)
     label_regex = re.compile(args.label_regex)
 

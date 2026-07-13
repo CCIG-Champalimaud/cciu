@@ -64,6 +64,17 @@ def _rows_for_yaml(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _to_yaml_safe(v: Any) -> Any:
+    """Convert a value into a YAML-serialisable primitive.
+
+    Recursively stringifies nested objects that are not plain Python
+    primitives, while preserving dictionaries, lists, and scalar types.
+
+    Args:
+        v (Any): The value to convert.
+
+    Returns:
+        Any: A YAML-safe representation of the input value.
+    """
     if isinstance(v, dict):
         return {str(kk): _to_yaml_safe(vv) for kk, vv in v.items()}
     if isinstance(v, (list, tuple)):

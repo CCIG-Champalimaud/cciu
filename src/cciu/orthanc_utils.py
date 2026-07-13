@@ -30,12 +30,26 @@ else:
 try:
     requests.get(ORTHANC_URL, auth=AUTH)
     ORTHANC_AVAILABLE = True
-except requests.exceptions.RequestException as e:
+except requests.exceptions.RequestException:
     ORTHANC_AVAILABLE = False
 
 
 def fail_if_orthanc_not_available(func):
+    """Decorator that raises if the configured Orthanc server is unreachable.
+
+    Args:
+        func (callable): The function to wrap.
+
+    Returns:
+        callable: The wrapped function.
+
+    Raises:
+        Exception: If ``ORTHANC_AVAILABLE`` is False when the wrapped function
+            is called.
+    """
+
     def decorator(*args, **kwargs):
+        """Run the wrapped function if Orthanc is available."""
         if not ORTHANC_AVAILABLE:
             raise Exception("Orthanc is not available")
         return func(*args, **kwargs)
@@ -334,6 +348,15 @@ def get_all_series_for_study_uid(
 def get_all_studies_for_patient_id(
     patient_id: str,
 ) -> dict[str, Any] | None:
+    """Returns all studies for a given patient ID.
+
+    Args:
+        patient_id (str): The patient ID.
+
+    Returns:
+        dict[str, Any] | None: A dictionary of studies keyed by Orthanc study
+            ID, or None if no studies are found.
+    """
     response = requests.post(
         f"{ORTHANC_URL}/tools/find",
         json={

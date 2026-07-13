@@ -1,10 +1,18 @@
+"""Top-level command-line interface for ``cciu``.
+
+Collects subcommand parsers from each entrypoint module and dispatches to
+the requested command.
+"""
+
 from cciu.entrypoints import describe_sitk
 from cciu.entrypoints import characterise_label_sizes
 from cciu.entrypoints import dicom_bvalue_table
 from cciu.entrypoints import dicom_series_table
 from cciu.entrypoints import dicom_feature_table
 
-def main_cli():    
+
+def main_cli() -> None:
+    """Parse command-line arguments and dispatch to the requested subcommand."""
     import argparse
 
     parser = argparse.ArgumentParser()

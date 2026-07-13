@@ -1,3 +1,5 @@
+"""CLI entrypoint to describe basic properties of SITK-readable images."""
+
 import argparse
 
 import SimpleITK as sitk
@@ -8,7 +10,16 @@ from cciu.entrypoints._output_utils import (
     write_output,
 )
 
+
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Add ``describe_sitk`` arguments to an argument parser.
+
+    Args:
+        parser (argparse.ArgumentParser): The parser to populate.
+
+    Returns:
+        argparse.ArgumentParser: The populated parser.
+    """
     parser.add_argument(
         "--input",
         help="Input files",
@@ -82,8 +93,12 @@ def basic_image_information(image: sitk.Image) -> dict[str, any]:
     }
 
 
-def print_unique_values(image: sitk.Image):
-    """ """
+def print_unique_values(image: sitk.Image) -> None:
+    """Print a human-readable summary of labels in an image.
+
+    Args:
+        image (sitk.Image): The image to inspect.
+    """
     n, np, ps = get_unique_labels(image, 10)
     print(f"  n_labels: {n}")
     if np:
@@ -94,7 +109,13 @@ def print_unique_values(image: sitk.Image):
             print(f"    size_mm3: {ps[i]:.3f}")
 
 
-def main(args):
+def main(args: argparse.Namespace) -> None:
+    """Describe the requested images and write the results.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI arguments, including ``input``,
+            ``output``, and ``format``.
+    """
     rows = []
     for inp in args.input:
         img = sitk.ReadImage(inp)

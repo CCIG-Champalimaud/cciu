@@ -1,3 +1,5 @@
+"""Integration tests for the ``dicom-feature-table`` CLI entrypoint."""
+
 import argparse
 import os
 import tempfile
@@ -18,6 +20,7 @@ PROSTATEX_STUDY_ENV = "PROSTATEX_TRAIN_STUDY_DIR"
     ),
 )
 def test_dicom_feature_table_runs_and_produces_nonempty_csv():
+    """``dicom-feature-table`` should produce a non-empty CSV for real data."""
     input_dir = Path(os.environ[PROSTATEX_STUDY_ENV])
     assert input_dir.is_dir(), f"Input dir does not exist: {input_dir}"
 

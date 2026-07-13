@@ -1,6 +1,7 @@
+"""CLI entrypoint to extract a configurable feature table from DICOM files."""
+
 import argparse
 import os
-from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -9,8 +10,6 @@ from pydicom import dcmread
 from cciu.entrypoints._output_utils import open_output, write_output
 from cciu.dicom_utils import (
     _extract_bvalue,
-    _extract_bvalue_ge,
-    _extract_bvalue_siemens,
 )
 from cciu.logging_utils import get_logger
 
@@ -70,6 +69,14 @@ DEFAULT_TAGS = list(dicom_header_dict.keys())
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Add ``dicom-feature-table`` arguments to an argument parser.
+
+    Args:
+        parser (argparse.ArgumentParser): The parser to populate.
+
+    Returns:
+        argparse.ArgumentParser: The populated parser.
+    """
     parser.add_argument(
         "--input",
         required=True,
@@ -96,6 +103,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
 
 
 def main(args: argparse.Namespace) -> None:
+    """Extract DICOM features per instance and write the results.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI arguments, including ``input``,
+            ``output``, ``format``, and ``tags``.
+    """
     root = Path(args.input)
     if not root.is_dir():
         raise SystemExit(
@@ -124,9 +137,13 @@ def main(args: argparse.Namespace) -> None:
                     if provenance == "global":
                         row["diffusion_bvalue"] = None if b is None else int(b)
                     elif provenance == "ge":
-                        row["diffusion_bvalue_ge"] = None if b is None else int(b)
+                        row["diffusion_bvalue_ge"] = (
+                            None if b is None else int(b)
+                        )
                     elif provenance == "siemens":
-                        row["diffusion_bvalue_siemens"] = None if b is None else int(b)
+                        row["diffusion_bvalue_siemens"] = (
+                            None if b is None else int(b)
+                        )
                     continue
                 if field in dicom_header_dict:
                     tag = dicom_header_dict[field]

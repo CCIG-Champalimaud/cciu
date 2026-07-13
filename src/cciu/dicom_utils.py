@@ -1,3 +1,10 @@
+"""Local DICOM utilities for sorting, filtering, and tag extraction.
+
+Includes helpers for sorting slices by instance number, selecting DICOM
+volumes by diffusion b-value, and best-effort extraction of vendor-specific
+b-value tags.
+"""
+
 import numpy as np
 from typing import Any
 from pydicom import dcmread
@@ -127,6 +134,7 @@ def get_orientation_string(dicom_file: Dataset) -> str:
         return "Coronal"
     elif plane[2] == 1:
         return "Axial"
+
 
 def _normalize_ge_bvalue(raw: Any) -> int | None:
     """Normalise GE b-value representations to a single integer.

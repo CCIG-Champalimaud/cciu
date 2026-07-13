@@ -240,10 +240,10 @@ def to_closest_canonical_sitk(
 ) -> sitk.Image | list[sitk.Image]:
     """
     Converts an image to the closest canonical orientation.
-    
+
     Args:
         img: The image to convert.
-        
+
     Returns:
         The image in canonical orientation.
     """
@@ -273,11 +273,11 @@ def from_closest_canonical_sitk(
 ) -> sitk.Image | list[sitk.Image]:
     """
     Restores a canonical image to its original orientation.
-    
+
     Args:
         canonical_img: The canonical image to restore.
         original_img: The original image to match.
-        
+
     Returns:
         The restored image matching the original properties.
     """

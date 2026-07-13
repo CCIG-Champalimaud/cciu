@@ -1,3 +1,5 @@
+"""CLI entrypoint to export a per-series metadata table from DICOM files."""
+
 import argparse
 import os
 from collections import defaultdict
@@ -16,6 +18,14 @@ logger = get_logger(__name__)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Add ``dicom-series-table`` arguments to an argument parser.
+
+    Args:
+        parser (argparse.ArgumentParser): The parser to populate.
+
+    Returns:
+        argparse.ArgumentParser: The populated parser.
+    """
     parser.add_argument(
         "--input",
         required=True,
@@ -26,7 +36,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         required=False,
         default=0,
         type=int,
-        help="Number of parallel processes. (default: 0 (no parallel processes))."
+        help="Number of parallel processes. (default: 0 (no parallel processes)).",
     )
     parser.add_argument(
         "--output",
@@ -41,7 +51,18 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
     return parser
 
+
 def _load_basic_tags(path: str) -> dict[str, Any]:
+    """Load the basic UIDs needed to group a DICOM file into a series.
+
+    Args:
+        path (str): Path to the DICOM instance.
+
+    Returns:
+        dict[str, Any]: A dictionary with ``PatientID``, ``StudyInstanceUID``,
+            and ``SeriesInstanceUID``, or an empty dict if the file cannot be
+            read.
+    """
     try:
         ds = dcmread(
             path,
@@ -60,21 +81,30 @@ def _load_basic_tags(path: str) -> dict[str, Any]:
         "SeriesInstanceUID": getattr(ds, "SeriesInstanceUID", ""),
     }
 
-def _iter_series(root: Path, n_workers: int = 0):
-    """Yield (series_key, representative_ds, num_instances) for each series.
 
-    series_key = (patient_id, study_uid, series_uid)
+def _iter_series(root: Path, n_workers: int = 0):
+    """Yield grouped series information from a DICOM directory.
+
+    Args:
+        root (Path): Root directory containing DICOM files.
+        n_workers (int, optional): Number of parallel processes to use when
+            reading basic tags. Values below 2 use the main thread.
+
+    Yields:
+        tuple[tuple[str, str, str], Dataset, int]: The series key
+        ``(patient_id, study_uid, series_uid)``, a representative pydicom
+        dataset, and the number of instances in the series.
     """
 
     all_file_paths = []
-    
+
     for dirpath, _, filenames in os.walk(root):
         for name in filenames:
             path = Path(dirpath) / name
             all_file_paths.append(str(path))
-    
+
     series_files: dict[tuple[str, str, str], list[Path]] = defaultdict(list)
-    
+
     if n_workers < 2:
         for path in tqdm(all_file_paths):
             basic_tags = _load_basic_tags(str(path))
@@ -86,7 +116,9 @@ def _iter_series(root: Path, n_workers: int = 0):
             series_files[(patient_id, study_uid, series_uid)].append(path)
     else:
         with Pool(n_workers) as pool:
-            for basic_tags in tqdm(pool.imap_unordered(_load_basic_tags, all_file_paths)):
+            for basic_tags in tqdm(
+                pool.imap_unordered(_load_basic_tags, all_file_paths)
+            ):
                 if not basic_tags:
                     continue
                 patient_id = basic_tags["PatientID"]
@@ -105,6 +137,12 @@ def _iter_series(root: Path, n_workers: int = 0):
 
 
 def main(args: argparse.Namespace) -> None:
+    """Export a per-series metadata table and write the results.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI arguments, including ``input``,
+            ``n_workers``, ``output``, and ``format``.
+    """
     root = Path(args.input)
     if not root.is_dir():
         raise SystemExit(
@@ -132,7 +170,7 @@ def main(args: argparse.Namespace) -> None:
             "columns": getattr(ds, "Columns", None),
             "num_instances": num_instances,
             "bvalue": bvalue,
-            "bvalue_provenance": provenance
+            "bvalue_provenance": provenance,
         }
         rows.append(row)
 

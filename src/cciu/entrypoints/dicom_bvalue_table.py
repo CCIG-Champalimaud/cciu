@@ -1,3 +1,5 @@
+"""CLI entrypoint to export a per-series b-value summary table."""
+
 import argparse
 import os
 from collections import defaultdict
@@ -14,6 +16,14 @@ logger = get_logger(__name__)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Add ``dicom-bvalue-table`` arguments to an argument parser.
+
+    Args:
+        parser (argparse.ArgumentParser): The parser to populate.
+
+    Returns:
+        argparse.ArgumentParser: The populated parser.
+    """
     parser.add_argument(
         "--input",
         required=True,
@@ -32,7 +42,14 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
     return parser
 
+
 def main(args: argparse.Namespace) -> None:
+    """Summarise b-values per DICOM series and write the results.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI arguments, including ``input``,
+            ``output``, and ``format``.
+    """
     root = Path(args.input)
     if not root.is_dir():
         raise SystemExit(

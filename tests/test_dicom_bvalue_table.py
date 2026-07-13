@@ -1,3 +1,5 @@
+"""Integration tests for the ``dicom-bvalue-table`` CLI entrypoint."""
+
 import argparse
 import os
 import tempfile
@@ -18,7 +20,9 @@ PROSTATEX_STUDY_ENV = "PROSTATEX_TRAIN_STUDY_DIR"
     ),
 )
 def test_dicom_bvalue_table_runs_and_produces_nonempty_csv():
-    """Integration-style test over a real DICOM study directory.
+    """``dicom-bvalue-table`` should produce a non-empty CSV for real data.
+
+    Integration-style test over a real DICOM study directory.
 
     Requires the environment variable PROSTATEX_TRAIN_STUDY_DIR to point to
     a directory like ProstateX-0017 containing DICOM instances.
