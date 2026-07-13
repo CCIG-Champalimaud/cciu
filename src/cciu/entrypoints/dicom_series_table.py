@@ -118,7 +118,7 @@ def _iter_series(root: Path, n_workers: int = 0):
         with Pool(n_workers) as pool:
             for basic_tags in tqdm(
                 pool.imap_unordered(_load_basic_tags, all_file_paths),
-                total=all_file_paths,
+                total=len(all_file_paths),
             ):
                 if not basic_tags:
                     continue
