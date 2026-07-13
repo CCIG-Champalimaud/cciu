@@ -88,7 +88,7 @@ def main(args: argparse.Namespace) -> None:
                 ds = dcmread(str(p), stop_before_pixels=True)
             except Exception:
                 continue
-            b = _extract_bvalue(ds)
+            b, _ = _extract_bvalue(ds)
             if b is not None:
                 bvalues.append(b)
 

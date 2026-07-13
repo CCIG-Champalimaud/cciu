@@ -71,23 +71,23 @@ class TestExtractBvalue:
         elem = MagicMock()
         elem.value = 800
         ds = self._make_ds({("0018", "9087"): elem})
-        assert _extract_bvalue(ds) == 800
+        assert _extract_bvalue(ds) == (800, "global")
 
     def test_siemens_tag_fallback(self):
         siemens_elem = MagicMock()
         siemens_elem.value = 400
         ds = self._make_ds({("0019", "100c"): siemens_elem})
-        assert _extract_bvalue(ds) == 400
+        assert _extract_bvalue(ds) == (400, "siemens")
 
     def test_ge_tag_fallback(self):
         ge_elem = MagicMock()
         ge_elem.value = "0\\800"
         ds = self._make_ds({("0043", "1039"): ge_elem})
-        assert _extract_bvalue(ds) == 0
+        assert _extract_bvalue(ds) == (0, "ge")
 
     def test_no_bvalue_returns_none(self):
         ds = self._make_ds({})
-        assert _extract_bvalue(ds) is None
+        assert _extract_bvalue(ds) == (None, None)
 
     def test_standard_tag_invalid_falls_through_to_siemens(self):
         bad_elem = MagicMock()
@@ -97,4 +97,4 @@ class TestExtractBvalue:
         ds = self._make_ds(
             {("0018", "9087"): bad_elem, ("0019", "100c"): siemens_elem}
         )
-        assert _extract_bvalue(ds) == 50
+        assert _extract_bvalue(ds) == (50, "siemens")

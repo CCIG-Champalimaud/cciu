@@ -188,7 +188,7 @@ def _extract_bvalue(ds: Any) -> int | None:
     bvalue_elem = ds.get(BVALUE_TAG, None)
     if bvalue_elem is not None:
         try:
-            return int(bvalue_elem.value)
+            return int(bvalue_elem.value), "global"
         except Exception:
             pass
 
@@ -198,15 +198,15 @@ def _extract_bvalue(ds: Any) -> int | None:
             getattr(siemens_elem, "value", siemens_elem)
         )
         if b is not None:
-            return b
+            return b, "siemens"
 
     ge_elem = ds.get(GE_BVALUE_TAG, None)
     if ge_elem is not None:
         b = _normalize_ge_bvalue(getattr(ge_elem, "value", ge_elem))
         if b is not None:
-            return b
+            return b, "ge"
 
-    return None
+    return None, None
 
 
 def _extract_bvalue_ge(ds: Any) -> int | None:

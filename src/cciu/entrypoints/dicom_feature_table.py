@@ -119,19 +119,15 @@ def main(args: argparse.Namespace) -> None:
             row: dict[str, Any] = {}
             for field in field_names:
                 # Normalised b-value using shared helpers
-                if field == "diffusion_bvalue":
-                    b = _extract_bvalue(ds)
-                    row[field] = None if b is None else int(b)
+                if "diffusion_bvalue" in field:
+                    b, provenance = _extract_bvalue(ds)
+                    if provenance == "global":
+                        row["diffusion_bvalue"] = None if b is None else int(b)
+                    elif provenance == "ge":
+                        row["diffusion_bvalue_ge"] = None if b is None else int(b)
+                    elif provenance == "siemens":
+                        row["diffusion_bvalue_siemens"] = None if b is None else int(b)
                     continue
-                if field == "diffusion_bvalue_ge":
-                    b_ge = _extract_bvalue_ge(ds)
-                    row[field] = None if b_ge is None else int(b_ge)
-                    continue
-                if field == "diffusion_bvalue_siemens":
-                    b_siemens = _extract_bvalue_siemens(ds)
-                    row[field] = None if b_siemens is None else int(b_siemens)
-                    continue
-
                 if field in dicom_header_dict:
                     tag = dicom_header_dict[field]
                     elem = ds.get(tag, None)

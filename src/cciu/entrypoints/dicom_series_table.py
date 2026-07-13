@@ -3,7 +3,9 @@ import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+from multiprocessing import Pool
 
+from tqdm import tqdm
 from pydicom import dcmread
 
 from cciu.entrypoints._output_utils import open_output, write_output
@@ -20,6 +22,13 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         help="Root directory containing DICOM files (dataset level)",
     )
     parser.add_argument(
+        "--n_workers",
+        required=False,
+        default=0,
+        type=int,
+        help="Number of parallel processes. (default: 0 (no parallel processes))."
+    )
+    parser.add_argument(
         "--output",
         help="Optional path to output file (default: stdout)",
         default=None,
@@ -32,35 +41,58 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
     return parser
 
+def _load_basic_tags(path: str) -> dict[str, Any]:
+    try:
+        ds = dcmread(
+            path,
+            stop_before_pixels=True,
+            specific_tags=[
+                "PatientID",
+                "StudyInstanceUID",
+                "SeriesInstanceUID",
+            ],
+        )
+    except Exception:
+        return {}
+    return {
+        "PatientID": getattr(ds, "PatientID", ""),
+        "StudyInstanceUID": getattr(ds, "StudyInstanceUID", ""),
+        "SeriesInstanceUID": getattr(ds, "SeriesInstanceUID", ""),
+    }
 
-def _iter_series(root: Path):
+def _iter_series(root: Path, n_workers: int = 0):
     """Yield (series_key, representative_ds, num_instances) for each series.
 
     series_key = (patient_id, study_uid, series_uid)
     """
-    series_files: dict[tuple[str, str, str], list[Path]] = defaultdict(list)
 
+    all_file_paths = []
+    
     for dirpath, _, filenames in os.walk(root):
         for name in filenames:
             path = Path(dirpath) / name
-            try:
-                ds = dcmread(
-                    str(path),
-                    stop_before_pixels=True,
-                    specific_tags=[
-                        "PatientID",
-                        "StudyInstanceUID",
-                        "SeriesInstanceUID",
-                    ],
-                )
-            except Exception:
+            all_file_paths.append(str(path))
+    
+    series_files: dict[tuple[str, str, str], list[Path]] = defaultdict(list)
+    
+    if n_workers < 2:
+        for path in tqdm(all_file_paths):
+            basic_tags = _load_basic_tags(str(path))
+            if not basic_tags:
                 continue
-            patient_id = getattr(ds, "PatientID", "")
-            study_uid = getattr(ds, "StudyInstanceUID", "")
-            series_uid = getattr(ds, "SeriesInstanceUID", "")
-            if not series_uid:
-                continue
+            patient_id = basic_tags["PatientID"]
+            study_uid = basic_tags["StudyInstanceUID"]
+            series_uid = basic_tags["SeriesInstanceUID"]
             series_files[(patient_id, study_uid, series_uid)].append(path)
+    else:
+        with Pool(n_workers) as pool:
+            for basic_tags in tqdm(pool.imap_unordered(_load_basic_tags, all_file_paths)):
+                if not basic_tags:
+                    continue
+                patient_id = basic_tags["PatientID"]
+                study_uid = basic_tags["StudyInstanceUID"]
+                series_uid = basic_tags["SeriesInstanceUID"]
+                series_files[(patient_id, study_uid, series_uid)].append(path)
 
     for key, paths in series_files.items():
         if not paths:
@@ -82,12 +114,13 @@ def main(args: argparse.Namespace) -> None:
     rows: list[dict[str, Any]] = []
 
     for (patient_id, study_uid, series_uid), ds, num_instances in _iter_series(
-        root
+        root, args.n_workers
     ):
+        bvalue, provenance = _extract_bvalue(ds)
         row: dict[str, Any] = {
             "patient_id": patient_id,
-            "study_uid": study_uid,
-            "series_uid": series_uid,
+            "study_uid": str(study_uid),
+            "series_uid": str(series_uid),
             "modality": getattr(ds, "Modality", ""),
             "series_description": getattr(ds, "SeriesDescription", ""),
             "study_description": getattr(ds, "StudyDescription", ""),
@@ -98,7 +131,8 @@ def main(args: argparse.Namespace) -> None:
             "rows": getattr(ds, "Rows", None),
             "columns": getattr(ds, "Columns", None),
             "num_instances": num_instances,
-            "bvalue": _extract_bvalue(ds),
+            "bvalue": bvalue,
+            "bvalue_provenance": provenance
         }
         rows.append(row)
 
@@ -116,6 +150,8 @@ def main(args: argparse.Namespace) -> None:
         "rows",
         "columns",
         "num_instances",
+        "bvalue",
+        "bvalue_provenance",
     ]
     out_fh, close_out = open_output(args.output)
     try:
