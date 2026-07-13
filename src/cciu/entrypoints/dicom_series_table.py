@@ -8,6 +8,7 @@ from pydicom import dcmread
 
 from cciu.entrypoints._output_utils import open_output, write_output
 from cciu.logging_utils import get_logger
+from cciu.dicom_utils import _extract_bvalue
 
 logger = get_logger(__name__)
 
@@ -97,6 +98,7 @@ def main(args: argparse.Namespace) -> None:
             "rows": getattr(ds, "Rows", None),
             "columns": getattr(ds, "Columns", None),
             "num_instances": num_instances,
+            "bvalue": _extract_bvalue(ds),
         }
         rows.append(row)
 

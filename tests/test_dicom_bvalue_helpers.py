@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from cciu.entrypoints.dicom_bvalue_table import (
+from cciu.dicom_utils import (
     _extract_bvalue,
     _normalize_ge_bvalue,
     _normalize_siemens_bvalue,

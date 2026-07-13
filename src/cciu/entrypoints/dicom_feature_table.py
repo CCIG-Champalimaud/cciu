@@ -7,7 +7,7 @@ from typing import Any
 from pydicom import dcmread
 
 from cciu.entrypoints._output_utils import open_output, write_output
-from cciu.entrypoints.dicom_bvalue_table import (
+from cciu.dicom_utils import (
     _extract_bvalue,
     _extract_bvalue_ge,
     _extract_bvalue_siemens,
