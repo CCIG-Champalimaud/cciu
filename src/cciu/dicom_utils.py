@@ -88,7 +88,12 @@ def filter_by_bvalue_from_dict(
 
 def sort_dicom_slices(file_paths: list[str]) -> list[str]:
     """
-    Sorts DICOM slices by instance number.
+    Sorts DICOM slices by spatial position along the slice normal.
+
+    Uses ImageOrientationPatient to compute the slice normal and projects
+    each slice's ImagePositionPatient onto it, sorting by the resulting
+    scalar. This ensures correct spatial ordering regardless of
+    InstanceNumber conventions.
 
     Args:
         file_paths (list[str]): list of DICOM files.
@@ -100,11 +105,22 @@ def sort_dicom_slices(file_paths: list[str]) -> list[str]:
     if len(file_paths) <= 1:
         return file_paths
 
-    instance_numbers = []
+    positions = []
     for p in file_paths:
         ds = dcmread(p, stop_before_pixels=True)
-        instance_numbers.append(int(getattr(ds, "InstanceNumber")))
-    order = np.argsort(np.array(instance_numbers))
+        positions.append(list(ds.ImagePositionPatient))
+
+    positions = np.array(positions)
+
+    if "ImageOrientationPatient" in ds:
+        iop = np.array(ds.ImageOrientationPatient).reshape(2, 3)
+        normal = np.cross(iop[0], iop[1])
+        normal = normal / np.linalg.norm(normal)
+    else:
+        normal = np.array([0, 0, 1])
+
+    projections = positions @ normal
+    order = np.argsort(projections)
     return [file_paths[i] for i in order]
 
 
