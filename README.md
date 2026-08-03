@@ -81,7 +81,7 @@ Available subcommands:
 
 - **`cciu.dicom_utils`**  
   Local DICOM helpers, e.g.:
-  - `sort_dicom_slices(file_paths)` – sort DICOM slices by instance number.
+  - `sort_dicom_slices(file_paths)` – sort DICOM slices by spatial position (ImagePositionPatient → SliceLocation → InstanceNumber → filename fallback).
   - `filter_by_bvalue_from_dict(dicom_files, target_bvalue, exact=False)` – keep slices for a given/closest diffusion b‑value.
 
 - **`cciu.orthanc_utils`**  
@@ -102,5 +102,8 @@ Available subcommands:
   - Converting images to/from a “closest canonical” orientation.
   - Cropping around a label with padding and minimum size.
   - Padding images, including vector images.
+  - `is_same_image_geometry(img_a, img_b)` – compare image geometries using `IsSameImageGeometryAs`.
+  - `label_erode(image, radius)` / `label_dilate(image, radius)` – label-preserving morphology via `LabelErodeDilateImageFilter`.
+  - `pathlib.Path` support for all file-path arguments.
 
 These modules are designed to be used independently; import only what you need in your pipelines.

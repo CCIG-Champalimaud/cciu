@@ -6,10 +6,9 @@ resampling images to a target geometry, changing spacing, and applying
 connected-component and morphology operations to masks.
 """
 
-import os
 import numpy as np
 import SimpleITK as sitk
-from glob import glob
+from pathlib import Path
 from typing import Sequence
 from pydicom import dcmread
 from pydicom_seg import MultiClassReader
@@ -34,7 +33,7 @@ def get_do_separate_z(
     Adapted from the nnU-Net codebase.
 
     Args:
-        spacing (Union[Tuple[float, ...], List[float], np.ndarray]): The spacing of the image.
+        spacing (tuple[float, ...] | list[float] | np.ndarray): The spacing of the image.
         anisotropy_threshold (float, optional): The threshold for anisotropy. Defaults to ANISO_THRESHOLD.
 
     Returns:
@@ -311,7 +310,7 @@ def from_closest_canonical_sitk(
 
 
 def get_crop(
-    image: str | sitk.Image,
+    image: str | Path, sitk.Image,
     target_image: sitk.Image | None = None,
     crop_padding: tuple[int | float, int | float, int | float] | None = (
         10,
@@ -324,7 +323,7 @@ def get_crop(
     Retrieves the bounding box of a label in an image.
 
     Args:
-        image (str | sitk.Image): input image.
+        image (str | Path | sitk.Image): input image.
         target_image (sitk.Image | None, optional): target image. Defaults to None.
         crop_padding (tuple[int, int, int] | None, optional): padding to be added to
             the cropped region. Defaults to None.
@@ -336,8 +335,8 @@ def get_crop(
     """
     logger.info("Cropping input")
     logger.info("Input size (before cropping): %s", image.GetSize())
-    if isinstance(image, str):
-        image = sitk.ReadImage(image)
+    if isinstance(image, (str, Path)):
+        image = sitk.ReadImage(str(image))
     if target_image is not None:
         image = resample_image_to_target(
             image, target=target_image, is_mask=True
@@ -440,7 +439,7 @@ def pad_sitk(
 
 
 def read_dicom_as_sitk(
-    file_path: str,
+    file_path: str | Path,
     metadata: dict[str, str] = {},
     bvalue_for_filtering: int | None = None,
 ) -> sitk.Image:
@@ -448,8 +447,7 @@ def read_dicom_as_sitk(
     Reads a DICOM series as an SITK file.
 
     Args:
-        file_path (str): list of DICOM files or directory containing DICOM
-            files.
+        file_path (str | Path): directory containing DICOM files.
         metadata (dict[str, str]): metadata to be added to the SITK image.
 
     Returns:
@@ -467,6 +465,7 @@ def read_dicom_as_sitk(
             return True
         return False
 
+    file_path = str(file_path)
     reader = sitk.ImageSeriesReader()
     dicom_file_names = reader.GetGDCMSeriesFileNames(file_path)
     good_file_paths = {}
@@ -502,7 +501,7 @@ def read_dicom_as_sitk(
     return sitk_image, good_file_paths
 
 
-def read_dicom_seg_as_volume(path: str) -> sitk.Image:
+def read_dicom_seg_as_volume(path: str | Path) -> sitk.Image:
     """
     Reads a DICOM SEG object from disk and returns it as a volume image.
 
@@ -512,8 +511,8 @@ def read_dicom_seg_as_volume(path: str) -> sitk.Image:
     convert it into a ``SimpleITK.Image`` volume.
 
     Args:
-        path (str): Path to a DICOM SEG file or a directory containing exactly
-            one such file.
+        path (str | Path): Path to a DICOM SEG file or a directory containing
+            exactly one such file.
 
     Raises:
         ValueError: If the provided directory contains more than one file.
@@ -523,17 +522,87 @@ def read_dicom_seg_as_volume(path: str) -> sitk.Image:
     Returns:
         sitk.Image: The decoded segmentation volume.
     """
-    if os.path.isdir(path):
-        path = glob(os.path.join(path, "*"))
-        if len(path) > 1:
+    path = Path(path)
+    if path.is_dir():
+        files = list(path.glob("*"))
+        if len(files) > 1:
             raise ValueError(
-                f"The segmentation series contains more than one file: {path}"
+                f"The segmentation series contains more than one file: {files}"
             )
-        path = path[0]
-    image = dcmread(path)
+        path = files[0]
+    image = dcmread(str(path))
     assert (
         image.SOPClassUID == "1.2.840.10008.5.1.4.1.1.66.4"
     ), f"Expected SOPClassUID 1.2.840.10008.5.1.4.1.1.66.4, got {image.SOPClassUID}"
     reader = MultiClassReader()
     result = reader.read(image)
     return result.image
+
+
+def is_same_image_geometry(
+    img_a: sitk.Image,
+    img_b: sitk.Image,
+    coordinate_tolerance: float = 1e-6,
+    direction_tolerance: float = 1e-6,
+) -> bool:
+    """Check whether two images share the same geometry.
+
+    Wraps ``sitk.Image.IsSameImageGeometryAs`` to compare origin, spacing,
+    size, and direction matrix within the given tolerances.
+
+    Args:
+        img_a (sitk.Image): first image.
+        img_b (sitk.Image): second image.
+        coordinate_tolerance (float): tolerance for origin/spacing/size.
+        direction_tolerance (float): tolerance for direction matrix entries.
+
+    Returns:
+        bool: True if the geometries match within tolerance.
+    """
+    return img_a.IsSameImageGeometryAs(
+        img_b, coordinate_tolerance, direction_tolerance
+    )
+
+
+def label_erode(
+    image: sitk.Image,
+    radius: int = 1,
+) -> sitk.Image:
+    """Erode a label image using the LabelErodeDilate filter.
+
+    Uses ``sitk.LabelErodeDilateImageFilter`` which preserves label values
+    during morphology.
+
+    Args:
+        image (sitk.Image): label image to erode.
+        radius (int): erosion radius in voxels. Defaults to 1.
+
+    Returns:
+        sitk.Image: eroded label image.
+    """
+    filt = sitk.LabelErodeDilateImageFilter()
+    filt.SetDilate(False)
+    filt.SetKernelRadius(radius)
+    return filt.Execute(image)
+
+
+def label_dilate(
+    image: sitk.Image,
+    radius: int = 1,
+) -> sitk.Image:
+    """Dilate a label image using the LabelErodeDilate filter.
+
+    Uses ``sitk.LabelErodeDilateImageFilter`` which preserves label values
+    during morphology.
+
+    Args:
+        image (sitk.Image): label image to dilate.
+        radius (int): dilation radius in voxels. Defaults to 1.
+
+    Returns:
+        sitk.Image: dilated label image.
+    """
+    filt = sitk.LabelErodeDilateImageFilter()
+    filt.SetDilate(True)
+    filt.SetKernelRadius(radius)
+    return filt.Execute(image)
