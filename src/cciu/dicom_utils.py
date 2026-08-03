@@ -45,10 +45,13 @@ def filter_by_bvalue_from_dict(
         siemens_bvalue = d.get(SIEMENS_BVALUE_TAG, None)
         ge_bvalue = d.get(GE_BVALUE_TAG, None)
         if bvalue is not None:
+            logger.debug("Using bvalue.value")
             curr_bvalue = bvalue.value
         elif siemens_bvalue is not None:
+            logger.debug("Using siemens_bvalue.value")
             curr_bvalue = siemens_bvalue.value
         elif ge_bvalue is not None:
+            logger.debug("Using ge_value.value")
             curr_bvalue = ge_bvalue.value
             if isinstance(curr_bvalue, bytes):
                 curr_bvalue = curr_bvalue.decode()
@@ -95,6 +98,9 @@ def sort_dicom_slices(file_paths: list[str]) -> list[str]:
     scalar. This ensures correct spatial ordering regardless of
     InstanceNumber conventions.
 
+    Falls back to SliceLocation, then InstanceNumber, then filename order
+    when ImagePositionPatient is not available.
+
     Args:
         file_paths (list[str]): list of DICOM files.
 
@@ -105,23 +111,45 @@ def sort_dicom_slices(file_paths: list[str]) -> list[str]:
     if len(file_paths) <= 1:
         return file_paths
 
-    positions = []
-    for p in file_paths:
-        ds = dcmread(p, stop_before_pixels=True)
-        positions.append(list(ds.ImagePositionPatient))
+    datasets = [dcmread(p, stop_before_pixels=True) for p in file_paths]
 
-    positions = np.array(positions)
+    if all("ImagePositionPatient" in ds for ds in datasets):
+        positions = np.array(
+            [list(ds.ImagePositionPatient) for ds in datasets]
+        )
 
-    if "ImageOrientationPatient" in ds:
-        iop = np.array(ds.ImageOrientationPatient).reshape(2, 3)
-        normal = np.cross(iop[0], iop[1])
-        normal = normal / np.linalg.norm(normal)
-    else:
-        normal = np.array([0, 0, 1])
+        ref_ds = datasets[0]
+        if "ImageOrientationPatient" in ref_ds:
+            iop = np.array(ref_ds.ImageOrientationPatient).reshape(2, 3)
+            normal = np.cross(iop[0], iop[1])
+            normal = normal / np.linalg.norm(normal)
+        else:
+            normal = np.array([0, 0, 1])
 
-    projections = positions @ normal
-    order = np.argsort(projections)
-    return [file_paths[i] for i in order]
+        projections = positions @ normal
+        order = np.argsort(projections)
+        return [file_paths[i] for i in order]
+
+    logger.warning(
+        "ImagePositionPatient not available for all slices, trying SliceLocation...")
+
+    if all("SliceLocation" in ds for ds in datasets):
+        sort_keys = [float(ds.SliceLocation) for ds in datasets]
+        order = np.argsort(sort_keys)
+        return [file_paths[i] for i in order]
+    
+    logger.warning(
+        "SliceLocation not available for all slices, trying InstanceNumber...")
+
+    if all("InstanceNumber" in ds for ds in datasets):
+        sort_keys = [int(ds.InstanceNumber) for ds in datasets]
+        order = np.argsort(sort_keys)
+        return [file_paths[i] for i in order]
+
+    logger.warning(
+        "No spatial sorting tags found; falling back to filename order."
+    )
+    return sorted(file_paths)
 
 
 def get_orientation_string(dicom_file: Dataset) -> str:
@@ -196,11 +224,13 @@ def _normalize_siemens_bvalue(raw: Any) -> int | None:
         return None
 
 
-def _extract_bvalue(ds: Any) -> int | None:
+def _extract_bvalue(ds: Any) -> tuple[int | None, str | None]:
     """Best-effort extraction of diffusion b-value from a DICOM dataset.
 
-    Tries standard and common vendor-specific tags. Returns an integer b-value
-    when possible, otherwise None.
+    Tries standard and common vendor-specific tags. Returns a tuple of
+    (b_value, source) where b_value is an integer when possible and
+    source is a string indicating which tag was used ("global",
+    "siemens", "ge", or None).
     """
     # Standard tag (0018,9087) - Diffusion b-value
     BVALUE_TAG = ("0018", "9087")
