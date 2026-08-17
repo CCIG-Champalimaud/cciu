@@ -91,9 +91,7 @@ def filter_by_bvalue_from_dict(
     return dicom_files
 
 
-def sort_dicom_slices(
-    file_paths: list[str] | None = None, files: list[Dataset] | None = None
-) -> list[str] | list[Dataset]:
+def sort_dicom_datasets(datasets: list[Dataset]) -> list[int]:
     """
     Sorts DICOM slices by spatial position along the slice normal.
 
@@ -102,8 +100,8 @@ def sort_dicom_slices(
     scalar. This ensures correct spatial ordering regardless of
     InstanceNumber conventions.
 
-    Falls back to SliceLocation, then InstanceNumber, then filename order
-    when ImagePositionPatient is not available.
+    Falls back to SliceLocation, then InstanceNumber, when ImagePositionPatient
+    is not available.
 
     Args:
         file_paths (list[str], optional): list of DICOM file paths. Defaults to
@@ -113,21 +111,8 @@ def sort_dicom_slices(
 
     Returns:
         list[str] | list[Dataset]: sorted list of DICOM files.
+
     """
-
-    if file_paths is None and files is None:
-        raise ValueError("Either file_paths or files should be specified.")
-
-    if len(file_paths) <= 1:
-        return file_paths
-
-    if files is None:
-        return_this = file_paths
-        datasets = [dcmread(p, stop_before_pixels=True) for p in file_paths]
-    else:
-        return_this = files
-        datasets = files
-
     if all("ImagePositionPatient" in ds for ds in datasets):
         positions = np.array([list(ds.ImagePositionPatient) for ds in datasets])
 
@@ -141,7 +126,7 @@ def sort_dicom_slices(
 
         projections = positions @ normal
         order = np.argsort(projections)
-        return [file_paths[i] for i in order]
+        return [i for i in order]
 
     logger.warning(
         "ImagePositionPatient not available for all slices, trying SliceLocation..."
@@ -150,7 +135,7 @@ def sort_dicom_slices(
     if all("SliceLocation" in ds for ds in datasets):
         sort_keys = [float(ds.SliceLocation) for ds in datasets]
         order = np.argsort(sort_keys)
-        return [return_this[i] for i in order]
+        return [i for i in order]
 
     logger.warning(
         "SliceLocation not available for all slices, trying InstanceNumber..."
@@ -159,12 +144,37 @@ def sort_dicom_slices(
     if all("InstanceNumber" in ds for ds in datasets):
         sort_keys = [int(ds.InstanceNumber) for ds in datasets]
         order = np.argsort(sort_keys)
-        return [return_this[i] for i in order]
+        return [i for i in order]
 
-    raise ValueError(
-        "DICOM files cannot be sorted: "
-        "no ImagePositionPatient, SliceLocation or InstanceNumber are available"
-    )
+    return None
+
+
+def sort_dicom_slices(
+    file_paths: list[str] | None = None,
+) -> list[str] | list[Dataset]:
+    """
+    Wrapper around ``sort_dicom_datasets``.
+
+    Falls back to SliceLocation, then InstanceNumber, then filename order
+    when ImagePositionPatient is not available.
+
+    Args:
+        file_paths (list[str], optional): list of DICOM file paths. Defaults to
+            None (``files`` should be specified).
+
+    Returns:
+        list[str] | list[Dataset]: sorted list of DICOM files.
+    """
+
+    if len(file_paths) <= 1:
+        return file_paths
+
+    datasets = [dcmread(p, stop_before_pixels=True) for p in file_paths]
+
+    order = sort_dicom_datasets(datasets)
+    if order is None:
+        return sorted(file_paths)
+    return [file_paths[i] for i in order]
 
 
 def get_orientation_string(dicom_file: Dataset) -> str:
