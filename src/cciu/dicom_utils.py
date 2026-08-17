@@ -149,11 +149,11 @@ def sort_dicom_datasets(datasets: list[Dataset]) -> list[int]:
     return None
 
 
-def sort_dicom_slices(
+def sort_dicom_files(
     file_paths: list[str] | None = None,
 ) -> list[str] | list[Dataset]:
     """
-    Wrapper around ``sort_dicom_datasets``.
+    Wrapper around ``sort_dicom_datasets`` for files.
 
     Falls back to SliceLocation, then InstanceNumber, then filename order
     when ImagePositionPatient is not available.
