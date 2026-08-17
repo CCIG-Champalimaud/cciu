@@ -5,6 +5,8 @@ volumes by diffusion b-value, and best-effort extraction of vendor-specific
 b-value tags.
 """
 
+from multiprocessing import Value
+
 import numpy as np
 from typing import Any
 from pydicom import dcmread
@@ -89,7 +91,9 @@ def filter_by_bvalue_from_dict(
     return dicom_files
 
 
-def sort_dicom_slices(file_paths: list[str]) -> list[str]:
+def sort_dicom_slices(
+    file_paths: list[str] | None = None, files: list[Dataset] | None = None
+) -> list[str] | list[Dataset]:
     """
     Sorts DICOM slices by spatial position along the slice normal.
 
@@ -102,21 +106,30 @@ def sort_dicom_slices(file_paths: list[str]) -> list[str]:
     when ImagePositionPatient is not available.
 
     Args:
-        file_paths (list[str]): list of DICOM files.
+        file_paths (list[str], optional): list of DICOM file paths. Defaults to
+            None (``files`` should be specified).
+        files (list[Dataset], optional): list of DICOM files. Defaults to None
+            (``file_paths`` should be specified).
 
     Returns:
-        list[str]: sorted list of DICOM files.
+        list[str] | list[Dataset]: sorted list of DICOM files.
     """
+
+    if file_paths is None and files is None:
+        raise ValueError("Either file_paths or files should be specified.")
 
     if len(file_paths) <= 1:
         return file_paths
 
-    datasets = [dcmread(p, stop_before_pixels=True) for p in file_paths]
+    if files is None:
+        return_this = file_paths
+        datasets = [dcmread(p, stop_before_pixels=True) for p in file_paths]
+    else:
+        return_this = files
+        datasets = files
 
     if all("ImagePositionPatient" in ds for ds in datasets):
-        positions = np.array(
-            [list(ds.ImagePositionPatient) for ds in datasets]
-        )
+        positions = np.array([list(ds.ImagePositionPatient) for ds in datasets])
 
         ref_ds = datasets[0]
         if "ImageOrientationPatient" in ref_ds:
@@ -131,25 +144,27 @@ def sort_dicom_slices(file_paths: list[str]) -> list[str]:
         return [file_paths[i] for i in order]
 
     logger.warning(
-        "ImagePositionPatient not available for all slices, trying SliceLocation...")
+        "ImagePositionPatient not available for all slices, trying SliceLocation..."
+    )
 
     if all("SliceLocation" in ds for ds in datasets):
         sort_keys = [float(ds.SliceLocation) for ds in datasets]
         order = np.argsort(sort_keys)
-        return [file_paths[i] for i in order]
-    
+        return [return_this[i] for i in order]
+
     logger.warning(
-        "SliceLocation not available for all slices, trying InstanceNumber...")
+        "SliceLocation not available for all slices, trying InstanceNumber..."
+    )
 
     if all("InstanceNumber" in ds for ds in datasets):
         sort_keys = [int(ds.InstanceNumber) for ds in datasets]
         order = np.argsort(sort_keys)
-        return [file_paths[i] for i in order]
+        return [return_this[i] for i in order]
 
-    logger.warning(
-        "No spatial sorting tags found; falling back to filename order."
+    raise ValueError(
+        "DICOM files cannot be sorted: "
+        "no ImagePositionPatient, SliceLocation or InstanceNumber are available"
     )
-    return sorted(file_paths)
 
 
 def get_orientation_string(dicom_file: Dataset) -> str:
