@@ -13,7 +13,7 @@ from typing import Sequence
 from pydicom import dcmread
 from pydicom_seg import MultiClassReader
 
-from cciu.dicom_utils import sort_dicom_slices, filter_by_bvalue_from_dict
+from cciu.dicom_utils import sort_dicom_datasets, filter_by_bvalue_from_dict
 from cciu.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -491,7 +491,7 @@ def read_dicom_as_sitk(
     good_file_paths = [
         good_file_paths[k] for k in sorted(good_file_paths.keys())
     ][0]
-    good_file_paths = sort_dicom_slices(good_file_paths)
+    good_file_paths = sort_dicom_datasets(good_file_paths)
     reader.SetFileNames(good_file_paths)
 
     sitk_image: sitk.Image = reader.Execute()
