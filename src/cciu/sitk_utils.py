@@ -310,7 +310,7 @@ def from_closest_canonical_sitk(
 
 
 def get_crop(
-    image: str | Path, sitk.Image,
+    image: str | Path | sitk.Image,
     target_image: sitk.Image | None = None,
     crop_padding: tuple[int | float, int | float, int | float] | None = (
         10,
