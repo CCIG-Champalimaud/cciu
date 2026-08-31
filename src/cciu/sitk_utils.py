@@ -491,8 +491,10 @@ def read_dicom_as_sitk(
     good_file_paths = [
         good_file_paths[k] for k in sorted(good_file_paths.keys())
     ][0]
-    good_file_paths = sort_dicom_datasets(good_file_paths)
-    reader.SetFileNames(good_file_paths)
+    good_file_path_idxs = sort_dicom_datasets(
+        [dicom_file_dict[k] for k in good_file_paths]
+    )
+    reader.SetFileNames([good_file_paths[idx] for idx in good_file_path_idxs])
 
     sitk_image: sitk.Image = reader.Execute()
 
