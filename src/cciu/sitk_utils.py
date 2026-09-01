@@ -312,7 +312,8 @@ def from_closest_canonical_sitk(
 def get_crop(
     image: str | Path | sitk.Image,
     target_image: sitk.Image | None = None,
-    crop_padding: tuple[int | float, int | float, int | float] | None = (
+    crop_padding: tuple[int | float, int | float, int | float]
+    | None = (
         10,
         10,
         10,
@@ -440,7 +441,7 @@ def pad_sitk(
 
 def read_dicom_as_sitk(
     file_path: str | Path,
-    metadata: dict[str, str] = {},
+    metadata: dict[str, str] | None = None,
     bvalue_for_filtering: int | None = None,
 ) -> sitk.Image:
     """
@@ -448,11 +449,14 @@ def read_dicom_as_sitk(
 
     Args:
         file_path (str | Path): directory containing DICOM files.
-        metadata (dict[str, str]): metadata to be added to the SITK image.
+        metadata (dict[str, str], optional): metadata to be added to the SITK
+            image. Defaults to None.
 
     Returns:
         sitk.Image: SITK image.
     """
+    if metadata is None:
+        metadata = {}
 
     def check_is_good(f):
         """

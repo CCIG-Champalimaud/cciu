@@ -104,13 +104,11 @@ def sort_dicom_datasets(datasets: list[Dataset]) -> list[int]:
     is not available.
 
     Args:
-        file_paths (list[str], optional): list of DICOM file paths. Defaults to
-            None (``files`` should be specified).
-        files (list[Dataset], optional): list of DICOM files. Defaults to None
-            (``file_paths`` should be specified).
+        datasets (list[Dataset]): list of pydicom Dataset objects.
 
     Returns:
-        list[str] | list[Dataset]: sorted list of DICOM files.
+        list[int] | None: indices of the datasets in spatial order, or None
+        if no spatial or fallback ordering keys are available.
 
     """
     if all("ImagePositionPatient" in ds for ds in datasets):
@@ -203,6 +201,7 @@ def get_orientation_string(dicom_file: Dataset) -> str:
         return "Coronal"
     elif plane[2] == 1:
         return "Axial"
+    return "Oblique"
 
 
 def _normalize_ge_bvalue(raw: Any) -> int | None:
