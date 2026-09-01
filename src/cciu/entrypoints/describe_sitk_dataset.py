@@ -9,6 +9,7 @@ from pathlib import Path
 import SimpleITK as sitk
 
 from cciu.entrypoints._output_utils import (
+    compute_stats,
     label_rows_to_long_format,
     open_output,
     overall_to_long_format,
@@ -88,28 +89,6 @@ def _process_image_file(
     return str(file), basic_info, n_labels, pixel_sizes, physical_sizes
 
 
-def _stats(values: list[float]) -> dict[str, float | int]:
-    """Compute basic statistics for a list of numeric values.
-
-    Args:
-        values (list[float]): The values to summarise.
-
-    Returns:
-        dict[str, float | int]: A dictionary with count, min, max, mean,
-            median, and optionally standard deviation.
-    """
-    d: dict[str, float | int] = {
-        "count": len(values),
-        "min": min(values),
-        "max": max(values),
-        "mean": round(statistics.mean(values), 6),
-        "median": round(statistics.median(values), 6),
-    }
-    if len(values) > 1:
-        d["stdev"] = round(statistics.stdev(values), 6)
-    return d
-
-
 def main(args: argparse.Namespace) -> None:
     """Describe a dataset of images and write the results.
 
@@ -184,10 +163,10 @@ def main(args: argparse.Namespace) -> None:
         overall["n_labels_median"] = round(statistics.median(all_n_labels), 3)
 
         overall["spacing"] = {
-            axis: _stats(spacing_values[axis]) for axis in spacing_values
+            axis: compute_stats(spacing_values[axis]) for axis in spacing_values
         }
         overall["size"] = {
-            axis: _stats(size_values[axis]) for axis in size_values
+            axis: compute_stats(size_values[axis]) for axis in size_values
         }
 
         label_stats: dict[str, dict] = {}
@@ -196,9 +175,11 @@ def main(args: argparse.Namespace) -> None:
         ):
             entry: dict = {}
             pix_vals = pixel_sizes_per_label.get(label_idx, [])
-            entry["pixel_sizes"] = _stats(pix_vals) if pix_vals else []
+            entry["pixel_sizes"] = compute_stats(pix_vals) if pix_vals else []
             phys_vals = physical_sizes_per_label.get(label_idx, [])
-            entry["physical_sizes"] = _stats(phys_vals) if phys_vals else []
+            entry["physical_sizes"] = (
+                compute_stats(phys_vals) if phys_vals else []
+            )
             label_stats[str(label_idx)] = entry
 
         if label_stats:

@@ -2,10 +2,33 @@
 
 import csv
 import json
+import statistics
 import sys
-from typing import Any, IO
+from typing import IO, Any
 
 import yaml
+
+
+def compute_stats(values: list[float]) -> dict[str, float | int]:
+    """Compute basic statistics for a list of numeric values.
+
+    Args:
+        values (list[float]): The values to summarise.
+
+    Returns:
+        dict[str, float | int]: A dictionary with count, min, max, mean,
+            median, and optionally standard deviation.
+    """
+    d: dict[str, float | int] = {
+        "count": len(values),
+        "min": min(values),
+        "max": max(values),
+        "mean": round(statistics.mean(values), 6),
+        "median": round(statistics.median(values), 6),
+    }
+    if len(values) > 1:
+        d["stdev"] = round(statistics.stdev(values), 6)
+    return d
 
 
 def write_output(
