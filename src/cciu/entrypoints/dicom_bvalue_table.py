@@ -1,16 +1,16 @@
 """CLI entrypoint to export a per-series b-value summary table."""
 
 import argparse
-import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 from pydicom import dcmread
+from tqdm import tqdm
 
+from cciu.dicom_utils import _extract_bvalue, iter_dicom_paths
 from cciu.entrypoints._output_utils import open_output, write_output
 from cciu.logging_utils import get_logger
-from cciu.dicom_utils import _extract_bvalue
 
 logger = get_logger(__name__)
 
@@ -59,27 +59,25 @@ def main(args: argparse.Namespace) -> None:
     # Group files by (PatientID, StudyInstanceUID, SeriesInstanceUID)
     series_files: dict[tuple[str, str, str], list[Path]] = defaultdict(list)
 
-    for dirpath, _, filenames in os.walk(root):
-        for name in filenames:
-            path = Path(dirpath) / name
-            try:
-                ds = dcmread(
-                    str(path),
-                    stop_before_pixels=True,
-                    specific_tags=[
-                        "PatientID",
-                        "StudyInstanceUID",
-                        "SeriesInstanceUID",
-                    ],
-                )
-            except Exception:
-                continue
-            patient_id = getattr(ds, "PatientID", "")
-            study_uid = getattr(ds, "StudyInstanceUID", "")
-            series_uid = getattr(ds, "SeriesInstanceUID", "")
-            if not series_uid:
-                continue
-            series_files[(patient_id, study_uid, series_uid)].append(path)
+    for path in tqdm(iter_dicom_paths(root)):
+        try:
+            ds = dcmread(
+                str(path),
+                stop_before_pixels=True,
+                specific_tags=[
+                    "PatientID",
+                    "StudyInstanceUID",
+                    "SeriesInstanceUID",
+                ],
+            )
+        except Exception:
+            continue
+        patient_id = getattr(ds, "PatientID", "")
+        study_uid = getattr(ds, "StudyInstanceUID", "")
+        series_uid = getattr(ds, "SeriesInstanceUID", "")
+        if not series_uid:
+            continue
+        series_files[(patient_id, study_uid, series_uid)].append(path)
 
     rows: list[dict[str, Any]] = []
 

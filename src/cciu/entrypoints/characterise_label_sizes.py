@@ -7,6 +7,7 @@ import statistics
 from pathlib import Path
 
 import SimpleITK as sitk
+from tqdm import tqdm
 
 from cciu.entrypoints._output_utils import (
     compute_stats,
@@ -111,7 +112,12 @@ def main(args: argparse.Namespace) -> None:
     if label_files:
         n_workers = args.n_cores or multiprocessing.cpu_count()
         with multiprocessing.Pool(processes=n_workers) as pool:
-            results = pool.map(_process_label_file, label_files)
+            results = list(
+                tqdm(
+                    pool.imap(_process_label_file, label_files),
+                    total=len(label_files),
+                )
+            )
 
         for (
             file_str,

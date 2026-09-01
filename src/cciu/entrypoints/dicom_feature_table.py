@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from pydicom import dcmread
+from tqdm import tqdm
 
 from cciu.dicom_utils import (
     _extract_bvalue,
@@ -121,7 +122,7 @@ def main(args: argparse.Namespace) -> None:
     # and/or raw DICOM attribute keywords for getattr(ds, ...).
     field_names: list[str] = args.tags or DEFAULT_TAGS
 
-    for path in iter_dicom_paths(root):
+    for path in tqdm(iter_dicom_paths(root)):
         try:
             ds = dcmread(str(path), stop_before_pixels=True)
         except Exception:

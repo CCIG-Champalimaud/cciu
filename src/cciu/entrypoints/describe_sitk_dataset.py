@@ -4,9 +4,11 @@ import argparse
 import multiprocessing
 import re
 import statistics
+from functools import partial
 from pathlib import Path
 
 import SimpleITK as sitk
+from tqdm import tqdm
 
 from cciu.entrypoints._output_utils import (
     compute_stats,
@@ -111,10 +113,10 @@ def main(args: argparse.Namespace) -> None:
 
     if image_files:
         n_workers = args.n_cores or multiprocessing.cpu_count()
+        worker = partial(_process_image_file, max_labels=args.max_labels)
         with multiprocessing.Pool(processes=n_workers) as pool:
-            results = pool.starmap(
-                _process_image_file,
-                [(f, args.max_labels) for f in image_files],
+            results = list(
+                tqdm(pool.imap(worker, image_files), total=len(image_files))
             )
 
         for (
