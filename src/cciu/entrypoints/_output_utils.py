@@ -140,9 +140,11 @@ def overall_to_long_format(
 ) -> list[dict[str, Any]]:
     """Flatten an overall summary dict into long-format rows.
 
-    Scalar fields become one row each with ``label_index=None``.
-    The nested per-label stats (under *labels_key*) are flattened into
-    attribute names like ``label_1_pixel_sizes_mean``, one row per stat.
+    Scalar fields become one row each with ``label_index=None``. Nested
+    stat-group dictionaries (e.g. ``spacing`` keyed by axis) are flattened
+    into attribute names like ``spacing_x_mean``. The per-label stats (under
+    *labels_key*) are flattened into attribute names like
+    ``label_1_pixel_sizes_mean``.
 
     Returns rows with the same schema as :func:`label_rows_to_long_format`:
     ``file``, ``attribute``, ``label_index``, ``value``.
@@ -152,14 +154,27 @@ def overall_to_long_format(
     for k, v in overall.items():
         if k == labels_key:
             continue
-        rows.append(
-            {
-                "file": file_label,
-                "attribute": k,
-                "label_index": None,
-                "value": v,
-            }
-        )
+        if isinstance(v, dict) and all(isinstance(g, dict) for g in v.values()):
+            for sub_key, stat_groups in v.items():
+                for stat_name, stat_val in stat_groups.items():
+                    attribute = f"{k}_{sub_key}_{stat_name}"
+                    rows.append(
+                        {
+                            "file": file_label,
+                            "attribute": attribute,
+                            "label_index": None,
+                            "value": stat_val,
+                        }
+                    )
+        else:
+            rows.append(
+                {
+                    "file": file_label,
+                    "attribute": k,
+                    "label_index": None,
+                    "value": v,
+                }
+            )
 
     label_stats = overall.get(labels_key, {})
     for label_idx, stat_groups in label_stats.items():

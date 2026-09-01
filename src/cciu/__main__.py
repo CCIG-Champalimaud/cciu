@@ -10,6 +10,7 @@ from cciu.entrypoints import dicom_bvalue_table
 from cciu.entrypoints import dicom_series_table
 from cciu.entrypoints import dicom_feature_table
 from cciu.entrypoints import inspect
+from cciu.entrypoints import describe_sitk_dataset
 
 
 def main_cli() -> None:
@@ -19,7 +20,7 @@ def main_cli() -> None:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
     describe_sitk_subparser = subparsers.add_parser(
-        "describe_sitk",
+        "describe-sitk",
         help="Describes a SITK-readable image",
     )
     describe_sitk.add_arguments(describe_sitk_subparser)
@@ -53,6 +54,12 @@ def main_cli() -> None:
     )
     inspect.add_arguments(inspect_subparser)
 
+    describe_sitk_dataset_subparser = subparsers.add_parser(
+        "describe-sitk-dataset",
+        help="Describes the properties of a dataset of SITK-readable images",
+    )
+    describe_sitk_dataset.add_arguments(describe_sitk_dataset_subparser)
+
     args = parser.parse_args()
     if args.command == "describe_sitk":
         describe_sitk.main(args)
@@ -66,6 +73,8 @@ def main_cli() -> None:
         dicom_feature_table.main(args)
     elif args.command == "inspect":
         inspect.main(args)
+    elif args.command == "describe-sitk-dataset":
+        describe_sitk_dataset.main(args)
     elif args.command == "help" or args.command == "h":
         parser.print_help()
     else:
