@@ -305,3 +305,6 @@ def _extract_bvalue_siemens(ds: Any) -> int | None:
         if siemens_elem is not None
         else None
     )
+
+
+extract_bvalue = _extract_bvalue
