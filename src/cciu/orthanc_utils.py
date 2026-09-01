@@ -17,6 +17,8 @@ from io import BytesIO
 from requests.auth import HTTPBasicAuth
 from zipfile import ZipFile
 
+from cciu.exceptions import OrthancError
+
 ORTHANC_URL = os.environ.get("ORTHANC_URL", "http://localhost:8042")
 ORTHANC_USER = os.environ.get("ORTHANC_USER", None)
 ORTHANC_PASSWORD = os.environ.get("ORTHANC_PASSWORD", None)
@@ -27,11 +29,18 @@ if ORTHANC_USER and ORTHANC_PASSWORD:
 else:
     AUTH = None
 
-try:
-    requests.get(ORTHANC_URL, auth=AUTH)
-    ORTHANC_AVAILABLE = True
-except requests.exceptions.RequestException:
-    ORTHANC_AVAILABLE = False
+
+def is_orthanc_available() -> bool:
+    """Return whether the configured Orthanc server is reachable.
+
+    Returns:
+        bool: True if the Orthanc server responds to a request.
+    """
+    try:
+        requests.get(ORTHANC_URL, auth=AUTH, timeout=5)
+        return True
+    except requests.exceptions.RequestException:
+        return False
 
 
 def fail_if_orthanc_not_available(func):
@@ -44,14 +53,14 @@ def fail_if_orthanc_not_available(func):
         callable: The wrapped function.
 
     Raises:
-        Exception: If ``ORTHANC_AVAILABLE`` is False when the wrapped function
-            is called.
+        OrthancError: If the Orthanc server is unreachable when the wrapped
+            function is called.
     """
 
     def decorator(*args, **kwargs):
         """Run the wrapped function if Orthanc is available."""
-        if not ORTHANC_AVAILABLE:
-            raise Exception("Orthanc is not available")
+        if not is_orthanc_available():
+            raise OrthancError("Orthanc is not available")
         return func(*args, **kwargs)
 
     return decorator
