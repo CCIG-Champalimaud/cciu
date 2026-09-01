@@ -17,10 +17,7 @@ from cciu.entrypoints._output_utils import (
     overall_to_long_format,
     write_output,
 )
-from cciu.entrypoints.describe_sitk import (
-    basic_image_information,
-    get_unique_labels,
-)
+from cciu.entrypoints.describe_sitk import get_image_information
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -54,12 +51,6 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         default=r"(\.nrrd|\.mha|.*\.nii(\.gz)?)$",
     )
     parser.add_argument(
-        "--max_labels",
-        type=int,
-        default=128,
-        help="Maximum labels to enumerate per image",
-    )
-    parser.add_argument(
         "--n_cores",
         type=int,
         default=None,
@@ -71,24 +62,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     return parser
 
 
-def _process_image_file(
-    file: Path, max_labels: int
-) -> tuple[str, dict, int, list[int], list[float]]:
-    """Load an image and extract its metadata and per-label sizes.
-
-    Args:
-        file (Path): Path to the image.
-        max_labels (int): Maximum number of labels to enumerate.
-
-    Returns:
-        tuple[str, dict, int, list[int], list[float]]: The file path, basic
-            image information, number of labels, pixel sizes per label, and
-            physical sizes per label.
-    """
-    img = sitk.ReadImage(str(file))
-    basic_info = basic_image_information(img)
-    n_labels, pixel_sizes, physical_sizes = get_unique_labels(img, max_labels)
-    return str(file), basic_info, n_labels, pixel_sizes, physical_sizes
+def worker(path: str) -> dict:
+    return get_image_information(path)[0]
 
 
 def main(args: argparse.Namespace) -> None:
@@ -105,87 +80,36 @@ def main(args: argparse.Namespace) -> None:
     image_files = [f for f in path.rglob("*") if sitk_regex.search(str(f))]
 
     file_rows: list[dict] = []
-    all_n_labels: list[int] = []
     spacing_values: dict[str, list[float]] = {"x": [], "y": [], "z": []}
     size_values: dict[str, list[int]] = {"x": [], "y": [], "z": []}
-    pixel_sizes_per_label: dict[int, list[int]] = {}
-    physical_sizes_per_label: dict[int, list[float]] = {}
 
     if image_files:
         n_workers = args.n_cores or multiprocessing.cpu_count()
-        worker = partial(_process_image_file, max_labels=args.max_labels)
         with multiprocessing.Pool(processes=n_workers) as pool:
             results = list(
-                tqdm(pool.imap(worker, image_files), total=len(image_files))
+                tqdm(
+                    pool.imap(worker, image_files),
+                    total=len(image_files),
+                )
             )
 
-        for (
-            file_str,
-            basic_info,
-            n_labels,
-            pixel_sizes,
-            physical_sizes,
-        ) in results:
-            all_n_labels.append(n_labels)
-
-            spacing = basic_info["spacing"]
-            size = basic_info["size"]
+        for info in results:
+            spacing = info["spacing"]
+            size = info["size"]
             for axis, index in (("x", 0), ("y", 1), ("z", 2)):
                 spacing_values[axis].append(spacing[index])
                 size_values[axis].append(size[index])
 
-            for idx, v in enumerate(pixel_sizes, start=1):
-                if v == 0:
-                    continue
-                pixel_sizes_per_label.setdefault(idx, []).append(v)
+            file_rows.append(info)
 
-            for idx, v in enumerate(physical_sizes, start=1):
-                if v == 0:
-                    continue
-                physical_sizes_per_label.setdefault(idx, []).append(v)
+    overall: dict = {"n_files": len(file_rows)}
 
-            file_rows.append(
-                {
-                    "file": file_str,
-                    "spacing": list(spacing),
-                    "size": list(size),
-                    "origin": list(basic_info["origin"]),
-                    "n_labels": n_labels,
-                    "pixel_sizes_per_label": pixel_sizes,
-                    "physical_sizes_per_label": physical_sizes,
-                }
-            )
-
-    overall: dict = {"n_files": len(all_n_labels)}
-    if all_n_labels:
-        overall["n_labels_total"] = sum(all_n_labels)
-        overall["n_labels_min"] = min(all_n_labels)
-        overall["n_labels_max"] = max(all_n_labels)
-        overall["n_labels_mean"] = round(statistics.mean(all_n_labels), 3)
-        overall["n_labels_median"] = round(statistics.median(all_n_labels), 3)
-
-        overall["spacing"] = {
-            axis: compute_stats(spacing_values[axis]) for axis in spacing_values
-        }
-        overall["size"] = {
-            axis: compute_stats(size_values[axis]) for axis in size_values
-        }
-
-        label_stats: dict[str, dict] = {}
-        for label_idx in sorted(
-            set(pixel_sizes_per_label) | set(physical_sizes_per_label)
-        ):
-            entry: dict = {}
-            pix_vals = pixel_sizes_per_label.get(label_idx, [])
-            entry["pixel_sizes"] = compute_stats(pix_vals) if pix_vals else []
-            phys_vals = physical_sizes_per_label.get(label_idx, [])
-            entry["physical_sizes"] = (
-                compute_stats(phys_vals) if phys_vals else []
-            )
-            label_stats[str(label_idx)] = entry
-
-        if label_stats:
-            overall["labels"] = label_stats
+    overall["spacing"] = {
+        axis: compute_stats(spacing_values[axis]) for axis in spacing_values
+    }
+    overall["size"] = {
+        axis: compute_stats(size_values[axis]) for axis in size_values
+    }
 
     output_data = {"files": file_rows, "overall": overall}
 

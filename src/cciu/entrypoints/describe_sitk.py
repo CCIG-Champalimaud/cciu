@@ -75,38 +75,48 @@ def get_unique_labels(
     return (n, np, ps)
 
 
-def basic_image_information(image: sitk.Image) -> dict[str, any]:
+def get_image_information(
+    path: str,
+    private_tags: bool = False,
+    include_unique_values: bool = False,
+) -> tuple[dict[str, any], sitk.ImageFileReader]:
     """
     Returns basic image information including spacing, size, and origin.
 
     Args:
-        image (sitk.Image): input image.
+        path (str): path to input image.
+        private_tags (bool, optional): returns private tags. Defaults to False.
+        include_unique_values (bool, optional): returns the number of unique
+            values. Defaults to False.
 
     Returns:
-        dict[str, any]: dictionary containing spacing, size, and origin.
-
+        dict[str, any]: dictionary containing spacing, size, and origin,
+            as well as metadata keys.
+            Private tags are included if `private_tags` is True.
+        sitk.ImageFileReader: the image file reader in case other operations
+            are necessary.
     """
-    return {
-        "spacing": image.GetSpacing(),
-        "size": image.GetSize(),
-        "origin": image.GetOrigin(),
+    reader = sitk.ImageFileReader()
+    reader.SetFileName(path)
+    if private_tags:
+        reader.LoadPrivateTagsOn()
+    reader.ReadImageInformation()
+    output = {
+        "file": path,
+        "spacing": reader.GetSpacing(),
+        "size": reader.GetSize(),
+        "origin": reader.GetOrigin(),
+        "metadata": {},
     }
-
-
-def print_unique_values(image: sitk.Image) -> None:
-    """Print a human-readable summary of labels in an image.
-
-    Args:
-        image (sitk.Image): The image to inspect.
-    """
-    n, np, ps = get_unique_labels(image, 10)
-    print(f"  n_labels: {n}")
-    if np:
-        print("  labels:")
-        for i in range(n):
-            print(f"  - label: {i + 1}")
-            print(f"    size_pixels: {np[i]}")
-            print(f"    size_mm3: {ps[i]:.3f}")
+    for key in reader.GetMetaDataKeys():
+        output["metadata"][key] = reader.GetMetaData(key)
+    if include_unique_values:
+        img = reader.Execute()
+        unique_values, pixel_sizes, physical_sizes = get_unique_labels(img)
+        output["n_unique_values"] = unique_values
+        output["label_pixel_sizes"] = pixel_sizes
+        output["label_physical_sizes"] = physical_sizes
+    return output, reader
 
 
 def main(args: argparse.Namespace) -> None:
@@ -118,19 +128,8 @@ def main(args: argparse.Namespace) -> None:
     """
     rows = []
     for inp in args.input:
-        img = sitk.ReadImage(inp)
-        basic_info = basic_image_information(img)
-        n_labels, pixel_sizes, physical_sizes = get_unique_labels(img)
-        row = {
-            "file": inp,
-            "spacing": list(basic_info["spacing"]),
-            "size": list(basic_info["size"]),
-            "origin": list(basic_info["origin"]),
-            "n_labels": n_labels,
-            "pixel_sizes_per_label": pixel_sizes,
-            "physical_sizes_per_label": physical_sizes,
-        }
-        rows.append(row)
+        info, _ = get_image_information(inp, include_unique_values=True)
+        rows.append(info)
 
     fh, close_out = open_output(args.output)
     try:

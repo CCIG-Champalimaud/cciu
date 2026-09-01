@@ -17,7 +17,7 @@ from cciu.entrypoints._output_utils import (
     write_output,
 )
 from cciu.entrypoints.describe_sitk import (
-    basic_image_information,
+    get_image_information,
     get_unique_labels,
 )
 
@@ -82,10 +82,10 @@ def _process_label_file(
             image information, number of labels, pixel sizes per label, and
             physical sizes per label.
     """
-    img = sitk.ReadImage(str(file))
-    basic_info = basic_image_information(img)
+    info, reader = get_image_information(str(file))
+    img = reader.Execute()
     n_labels, pixel_sizes, physical_sizes = get_unique_labels(img)
-    return str(file), basic_info, n_labels, pixel_sizes, physical_sizes
+    return str(file), info, n_labels, pixel_sizes, physical_sizes
 
 
 def main(args: argparse.Namespace) -> None:

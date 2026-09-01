@@ -24,6 +24,11 @@ def main_cli() -> None:
         help="Describes a SITK-readable image",
     )
     describe_sitk.add_arguments(describe_sitk_subparser)
+    describe_sitk_dataset_subparser = subparsers.add_parser(
+        "describe-sitk-dataset",
+        help="Describes the properties of a dataset of SITK-readable images",
+    )
+    describe_sitk_dataset.add_arguments(describe_sitk_dataset_subparser)
     characterise_label_sizes_subparser = subparsers.add_parser(
         "characterise-label-sizes",
         help="Characterises the label sizes in a folder with SITK-readable files",
@@ -54,15 +59,11 @@ def main_cli() -> None:
     )
     inspect.add_arguments(inspect_subparser)
 
-    describe_sitk_dataset_subparser = subparsers.add_parser(
-        "describe-sitk-dataset",
-        help="Describes the properties of a dataset of SITK-readable images",
-    )
-    describe_sitk_dataset.add_arguments(describe_sitk_dataset_subparser)
-
     args = parser.parse_args()
-    if args.command == "describe_sitk":
+    if args.command == "describe-sitk":
         describe_sitk.main(args)
+    elif args.command == "describe-sitk-dataset":
+        describe_sitk_dataset.main(args)
     elif args.command == "characterise-label-sizes":
         characterise_label_sizes.main(args)
     elif args.command == "dicom-bvalue-table":
@@ -73,8 +74,6 @@ def main_cli() -> None:
         dicom_feature_table.main(args)
     elif args.command == "inspect":
         inspect.main(args)
-    elif args.command == "describe-sitk-dataset":
-        describe_sitk_dataset.main(args)
     elif args.command == "help" or args.command == "h":
         parser.print_help()
     else:
