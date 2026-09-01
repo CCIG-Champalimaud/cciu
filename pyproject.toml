@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=2.2.6",
+    "pre-commit>=4.6.2",
     "pydicom>=3.0.2",
     "pydicom-seg",
     "pytest>=9.0.3",
