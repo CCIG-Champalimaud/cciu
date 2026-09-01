@@ -9,6 +9,7 @@ from cciu.entrypoints import characterise_label_sizes
 from cciu.entrypoints import dicom_bvalue_table
 from cciu.entrypoints import dicom_series_table
 from cciu.entrypoints import dicom_feature_table
+from cciu.entrypoints import inspect
 
 
 def main_cli() -> None:
@@ -46,6 +47,12 @@ def main_cli() -> None:
     )
     dicom_feature_table.add_arguments(dicom_feature_table_subparser)
 
+    inspect_subparser = subparsers.add_parser(
+        "inspect",
+        help="Classifies and describes medical image inputs",
+    )
+    inspect.add_arguments(inspect_subparser)
+
     args = parser.parse_args()
     if args.command == "describe_sitk":
         describe_sitk.main(args)
@@ -57,6 +64,8 @@ def main_cli() -> None:
         dicom_series_table.main(args)
     elif args.command == "dicom-feature-table":
         dicom_feature_table.main(args)
+    elif args.command == "inspect":
+        inspect.main(args)
     elif args.command == "help" or args.command == "h":
         parser.print_help()
     else:
