@@ -1,16 +1,20 @@
 """Local DICOM utilities for sorting, filtering, and tag extraction.
 
 Includes helpers for sorting slices by instance number, selecting DICOM
-volumes by diffusion b-value, and best-effort extraction of vendor-specific
-b-value tags.
+volumes by diffusion b-value, best-effort extraction of vendor-specific
+b-value tags, and grouping DICOM files into series within a dataset tree.
 """
 
-from multiprocessing import Value
+import os
+from collections import defaultdict
+from multiprocessing import Pool
+from pathlib import Path
+from typing import Any
 
 import numpy as np
-from typing import Any
 from pydicom import dcmread
 from pydicom.dataset import Dataset
+from tqdm import tqdm
 
 from cciu.logging_utils import get_logger
 
@@ -308,3 +312,116 @@ def _extract_bvalue_siemens(ds: Any) -> int | None:
 
 
 extract_bvalue = _extract_bvalue
+
+
+def iter_dicom_paths(root: str | Path) -> list[str]:
+    """List the file paths under *root*.
+
+    Args:
+        root (str | Path): Root directory to walk.
+
+    Returns:
+        list[str]: The paths of all files found under *root*.
+    """
+    root = Path(root)
+    return [
+        str(Path(dirpath) / name)
+        for dirpath, _, filenames in os.walk(root)
+        for name in filenames
+    ]
+
+
+def read_basic_tags(path: str | Path) -> dict[str, str]:
+    """Read the tags needed to group a DICOM file into a series.
+
+    Args:
+        path (str | Path): Path to the DICOM instance.
+
+    Returns:
+        dict[str, str]: A dictionary with ``PatientID``, ``StudyInstanceUID``,
+            and ``SeriesInstanceUID``, or an empty dict if the file cannot be
+            read.
+    """
+    try:
+        ds = dcmread(
+            str(path),
+            stop_before_pixels=True,
+            specific_tags=[
+                "PatientID",
+                "StudyInstanceUID",
+                "SeriesInstanceUID",
+            ],
+        )
+    except Exception:
+        return {}
+    return {
+        "PatientID": getattr(ds, "PatientID", ""),
+        "StudyInstanceUID": getattr(ds, "StudyInstanceUID", ""),
+        "SeriesInstanceUID": getattr(ds, "SeriesInstanceUID", ""),
+    }
+
+
+def _read_basic_tags_with_path(path: str) -> tuple[str, dict[str, str]]:
+    """Read basic tags for one path, returning the path alongside them.
+
+    Args:
+        path (str): Path to the DICOM instance.
+
+    Returns:
+        tuple[str, dict[str, str]]: The path and its basic tags.
+    """
+    return path, read_basic_tags(path)
+
+
+def group_into_series(
+    paths: list[str | Path],
+    n_workers: int = 0,
+    show_progress: bool = False,
+) -> dict[tuple[str, str, str], list[str]]:
+    """Group DICOM file paths into series.
+
+    Series are keyed by ``(PatientID, StudyInstanceUID, SeriesInstanceUID)``.
+    Files that cannot be read are skipped. When ``n_workers`` is 2 or more the
+    basic tags are read in parallel.
+
+    Args:
+        paths (list[str | Path]): DICOM file paths to group.
+        n_workers (int, optional): Number of parallel processes to use when
+            reading basic tags. Values below 2 use the main thread.
+            Defaults to 0.
+        show_progress (bool, optional): Whether to show a progress bar.
+            Defaults to False.
+
+    Returns:
+        dict[tuple[str, str, str], list[str]]: Series key to file paths.
+    """
+    paths = [str(p) for p in paths]
+    series_files: dict[tuple[str, str, str], list[str]] = defaultdict(list)
+
+    if n_workers < 2:
+        iterator = tqdm(paths) if show_progress else paths
+        for path in iterator:
+            tags = read_basic_tags(path)
+            if not tags:
+                continue
+            key = (
+                tags["PatientID"],
+                tags["StudyInstanceUID"],
+                tags["SeriesInstanceUID"],
+            )
+            series_files[key].append(path)
+        return series_files
+
+    with Pool(n_workers) as pool:
+        results = pool.imap_unordered(_read_basic_tags_with_path, paths)
+        iterator = tqdm(results, total=len(paths)) if show_progress else results
+        for path, tags in iterator:
+            if not tags:
+                continue
+            key = (
+                tags["PatientID"],
+                tags["StudyInstanceUID"],
+                tags["SeriesInstanceUID"],
+            )
+            series_files[key].append(path)
+    return series_files

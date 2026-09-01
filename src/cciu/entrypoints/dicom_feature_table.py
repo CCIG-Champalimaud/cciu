@@ -1,16 +1,16 @@
 """CLI entrypoint to extract a configurable feature table from DICOM files."""
 
 import argparse
-import os
 from pathlib import Path
 from typing import Any
 
 from pydicom import dcmread
 
-from cciu.entrypoints._output_utils import open_output, write_output
 from cciu.dicom_utils import (
     _extract_bvalue,
+    iter_dicom_paths,
 )
+from cciu.entrypoints._output_utils import open_output, write_output
 from cciu.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -121,45 +121,38 @@ def main(args: argparse.Namespace) -> None:
     # and/or raw DICOM attribute keywords for getattr(ds, ...).
     field_names: list[str] = args.tags or DEFAULT_TAGS
 
-    for dirpath, _, filenames in os.walk(root):
-        for name in filenames:
-            path = Path(dirpath) / name
-            try:
-                ds = dcmread(str(path), stop_before_pixels=True)
-            except Exception:
+    for path in iter_dicom_paths(root):
+        try:
+            ds = dcmread(str(path), stop_before_pixels=True)
+        except Exception:
+            continue
+
+        row: dict[str, Any] = {}
+        for field in field_names:
+            if "diffusion_bvalue" in field:
+                b, provenance = _extract_bvalue(ds)
+                if provenance == "global":
+                    row["diffusion_bvalue"] = None if b is None else int(b)
+                elif provenance == "ge":
+                    row["diffusion_bvalue_ge"] = None if b is None else int(b)
+                elif provenance == "siemens":
+                    row["diffusion_bvalue_siemens"] = (
+                        None if b is None else int(b)
+                    )
                 continue
-
-            row: dict[str, Any] = {}
-            for field in field_names:
-                # Normalised b-value using shared helpers
-                if "diffusion_bvalue" in field:
-                    b, provenance = _extract_bvalue(ds)
-                    if provenance == "global":
-                        row["diffusion_bvalue"] = None if b is None else int(b)
-                    elif provenance == "ge":
-                        row["diffusion_bvalue_ge"] = (
-                            None if b is None else int(b)
-                        )
-                    elif provenance == "siemens":
-                        row["diffusion_bvalue_siemens"] = (
-                            None if b is None else int(b)
-                        )
-                    continue
-                if field in dicom_header_dict:
-                    tag = dicom_header_dict[field]
-                    elem = ds.get(tag, None)
-                    if elem is None:
-                        row[field] = None
-                    else:
-                        # pydicom DataElement exposes .value
-                        value = getattr(elem, "value", elem)
-                        row[field] = str(value)
+            if field in dicom_header_dict:
+                tag = dicom_header_dict[field]
+                elem = ds.get(tag, None)
+                if elem is None:
+                    row[field] = None
                 else:
-                    # Fallback: interpret as DICOM keyword / attribute name
-                    value = getattr(ds, field, None)
-                    row[field] = None if value is None else str(value)
+                    value = getattr(elem, "value", elem)
+                    row[field] = str(value)
+            else:
+                value = getattr(ds, field, None)
+                row[field] = None if value is None else str(value)
 
-            feature_rows.append(row)
+        feature_rows.append(row)
 
     fh, close_out = open_output(args.output)
     try:

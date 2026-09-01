@@ -1,18 +1,18 @@
 """CLI entrypoint to export a per-series metadata table from DICOM files."""
 
 import argparse
-import os
-from collections import defaultdict
 from pathlib import Path
 from typing import Any
-from multiprocessing import Pool
 
-from tqdm import tqdm
 from pydicom import dcmread
 
+from cciu.dicom_utils import (
+    _extract_bvalue,
+    group_into_series,
+    iter_dicom_paths,
+)
 from cciu.entrypoints._output_utils import open_output, write_output
 from cciu.logging_utils import get_logger
-from cciu.dicom_utils import _extract_bvalue
 
 logger = get_logger(__name__)
 
@@ -52,36 +52,6 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     return parser
 
 
-def _load_basic_tags(path: str) -> dict[str, Any]:
-    """Load the basic UIDs needed to group a DICOM file into a series.
-
-    Args:
-        path (str): Path to the DICOM instance.
-
-    Returns:
-        dict[str, Any]: A dictionary with ``PatientID``, ``StudyInstanceUID``,
-            and ``SeriesInstanceUID``, or an empty dict if the file cannot be
-            read.
-    """
-    try:
-        ds = dcmread(
-            path,
-            stop_before_pixels=True,
-            specific_tags=[
-                "PatientID",
-                "StudyInstanceUID",
-                "SeriesInstanceUID",
-            ],
-        )
-    except Exception:
-        return {}
-    return {
-        "PatientID": getattr(ds, "PatientID", ""),
-        "StudyInstanceUID": getattr(ds, "StudyInstanceUID", ""),
-        "SeriesInstanceUID": getattr(ds, "SeriesInstanceUID", ""),
-    }
-
-
 def _iter_series(root: Path, n_workers: int = 0):
     """Yield grouped series information from a DICOM directory.
 
@@ -95,46 +65,23 @@ def _iter_series(root: Path, n_workers: int = 0):
         ``(patient_id, study_uid, series_uid)``, a representative pydicom
         dataset, and the number of instances in the series.
     """
+    paths = iter_dicom_paths(root)
+    series_files = group_into_series(
+        paths, n_workers=n_workers, show_progress=True
+    )
 
-    all_file_paths = []
-
-    for dirpath, _, filenames in os.walk(root):
-        for name in filenames:
-            path = Path(dirpath) / name
-            all_file_paths.append(str(path))
-
-    series_files: dict[tuple[str, str, str], list[Path]] = defaultdict(list)
-
-    if n_workers < 2:
-        for path in tqdm(all_file_paths):
-            basic_tags = _load_basic_tags(str(path))
-            if not basic_tags:
-                continue
-            patient_id = basic_tags["PatientID"]
-            study_uid = basic_tags["StudyInstanceUID"]
-            series_uid = basic_tags["SeriesInstanceUID"]
-            series_files[(patient_id, study_uid, series_uid)].append(path)
-    else:
-        with Pool(n_workers) as pool:
-            for basic_tags in tqdm(
-                pool.imap_unordered(_load_basic_tags, all_file_paths),
-                total=len(all_file_paths),
-            ):
-                if not basic_tags:
-                    continue
-                patient_id = basic_tags["PatientID"]
-                study_uid = basic_tags["StudyInstanceUID"]
-                series_uid = basic_tags["SeriesInstanceUID"]
-                series_files[(patient_id, study_uid, series_uid)].append(path)
-
-    for key, paths in series_files.items():
-        if not paths:
+    for (
+        patient_id,
+        study_uid,
+        series_uid,
+    ), series_paths in series_files.items():
+        if not series_paths:
             continue
         try:
-            rep_ds = dcmread(str(paths[0]), stop_before_pixels=True)
+            rep_ds = dcmread(str(series_paths[0]), stop_before_pixels=True)
         except Exception:
             continue
-        yield key, rep_ds, len(paths)
+        yield (patient_id, study_uid, series_uid), rep_ds, len(series_paths)
 
 
 def main(args: argparse.Namespace) -> None:
